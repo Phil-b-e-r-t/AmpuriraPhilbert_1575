@@ -305,8 +305,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _pull() async {
-    if (sales.any((s) => !s.synced))
+    if (sales.any((s) => !s.synced)) {
       return; // never overwrite stock while sales are waiting
+    }
     final p = await Api.get('/products') as List;
     final c = await Api.get('/customers') as List;
     final s = await Api.get('/sales?days=35') as List;

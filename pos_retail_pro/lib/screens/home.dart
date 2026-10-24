@@ -119,10 +119,10 @@ class HomePage extends StatelessWidget {
                   onPressed: () => showNotifications(context)),
             ),
             const SizedBox(width: 6),
-            CircleAvatar(
+            const CircleAvatar(
                 radius: 14,
                 backgroundColor: C.border,
-                child: const Icon(Icons.person, size: 16, color: C.grey)),
+                child: Icon(Icons.person, size: 16, color: C.grey)),
           ]),
           const SizedBox(height: 18),
           Container(
