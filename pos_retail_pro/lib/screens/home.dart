@@ -31,7 +31,7 @@ class _HomeShellState extends State<HomeShell> {
               width: double.infinity,
               color: C.amber,
               padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 6, bottom: 6),
-              child: const Text('Working offline • sales will sync automatically',
+              child: const Text('Working offline... sales will update automatically',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
             ),
@@ -109,7 +109,7 @@ class HomePage extends StatelessWidget {
           const SizedBox(height: 14),
           Row(children: [
             Expanded(
-                child: Text('$greet,\n${s.userName} 👋',
+                child: Text('$greet,\n${s.userName}',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.3))),
             Badge(
               isLabelVisible: s.unread > 0,

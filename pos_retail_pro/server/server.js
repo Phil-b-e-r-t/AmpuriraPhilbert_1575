@@ -21,6 +21,7 @@ if (!JWT_SECRET || JWT_SECRET.length < 16) {
 const app = express();
 app.use(cors());              // production: cors({ origin: 'https://your-site.com' })
 app.use(express.json({ limit: '1mb' }));
+app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // ───────────── helpers ─────────────
 const wrap = (fn) => (req, res) => fn(req, res).catch((e) => { console.error(e); res.status(500).json({ error: 'Server error' }); });
