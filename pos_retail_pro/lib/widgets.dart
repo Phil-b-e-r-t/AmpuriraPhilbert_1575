@@ -262,14 +262,19 @@ class ProductImage extends StatelessWidget {
   final double w, h;
   const ProductImage(this.path, {super.key, this.w = 32, this.h = 56});
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: w,
-        height: h,
-        child: path.isEmpty
-            ? _fallback()
-            : Image.asset(path,
-                fit: BoxFit.contain, errorBuilder: (_, __, ___) => _fallback()),
-      );
+  Widget build(BuildContext context) {
+    final assetPath = path == 'assets/images/coca.png'
+        ? 'assets/images/coke.png'
+        : path;
+    return SizedBox(
+      width: w,
+      height: h,
+      child: assetPath.isEmpty
+          ? _fallback()
+          : Image.asset(assetPath,
+              fit: BoxFit.contain, errorBuilder: (_, __, ___) => _fallback()),
+    );
+  }
   Widget _fallback() => Container(
         decoration:
             BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(6)),

@@ -4,6 +4,64 @@ import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
+Future<void> _showServerDialog(BuildContext context) async {
+  final state = context.read<AppState>();
+  final controller = TextEditingController(text: state.apiBase);
+  final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+            title: const Text('Server address'),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text(
+                  'On this Wi-Fi, use http://192.168.206.31:3000. Keep your phone and computer on the same network, start the server on your computer, and allow Node through Windows Firewall.'),
+              const SizedBox(height: 12),
+              TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.url,
+                  autocorrect: false,
+                  decoration: const InputDecoration(
+                      hintText: 'http://192.168.1.10:3000')),
+            ]),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Save')),
+            ],
+          ));
+
+  if (saved == true) {
+    final uri = Uri.tryParse(controller.text.trim());
+    if (uri == null ||
+        uri.host.isEmpty ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
+      if (context.mounted) {
+        context.snack(
+            'Enter a complete server URL starting with http:// or https://');
+      }
+    } else {
+      await state.saveApiBase(uri.toString());
+    }
+  }
+  controller.dispose();
+}
+
+void _showAuthError(BuildContext context, String message) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text(message),
+      action: message.startsWith('Cannot reach the server.')
+          ? SnackBarAction(
+              label: 'Server settings',
+              onPressed: () => _showServerDialog(context))
+          : null,
+    ));
+}
+
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
@@ -76,7 +134,7 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      context.snack(err);
+      _showAuthError(context, err);
       return;
     }
     // main.dart now swaps the first screen to the app; just close the login page.
@@ -84,27 +142,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _serverDialog() async {
-    final s = context.read<AppState>();
-    final c = TextEditingController(text: s.apiBase);
-    final ok = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-              title: const Text('Server address'),
-              content: TextField(
-                  controller: c,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(
-                      hintText: 'http://192.168.1.10:3000')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel')),
-                TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Save')),
-              ],
-            ));
-    if (ok == true) await s.saveApiBase(c.text);
+    await _showServerDialog(context);
   }
 
   Widget _social(String label, IconData icon) => Padding(
@@ -276,7 +314,7 @@ class _SignupPageState extends State<SignupPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (error != null) {
-      context.snack(error);
+      _showAuthError(context, error);
       return;
     }
     Navigator.popUntil(context, (route) => route.isFirst);
@@ -291,6 +329,12 @@ class _SignupPageState extends State<SignupPage> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
           ),
+          actions: [
+            IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                tooltip: 'Server address',
+                onPressed: () => _showServerDialog(context)),
+          ],
         ),
         body: SafeArea(
           child: ListView(

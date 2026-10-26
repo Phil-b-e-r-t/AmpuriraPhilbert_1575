@@ -1,5 +1,7 @@
 # POS Retail Pro (Flutter + PayPal)
 
+The API server must be running for login and sign-up. For local development, web and mobile use `http://192.168.206.31:3000` by default so both connect to the same server. This address is specific to this development Wi-Fi network and must be changed if the computer's IP changes. For a deployed server, build with `--dart-define=API_BASE_URL=https://your-server.example.com`.
+
 ## 1. Create the project and drop in the code
 ```bash
 flutter create pos_retail_pro --org com.yourname --platforms android,ios
@@ -45,7 +47,7 @@ iOS `ios/Podfile`: `platform :ios, '13.0'`. For local http testing add NSAppTran
 ```bash
 flutter run
 ```
-Login: any email/phone + any password (demo login, replace with Firebase Auth).
+Login uses the owner account configured in `server/.env` (defaults: `owner@pos.com` / `ChangeMe123!`); change the default password before use. New users can register from Sign Up while the API server is running.
 
 ## Before going live
 - Set `seedDemoData = false` in lib/db.dart.
@@ -84,8 +86,8 @@ Flutter app  ──HTTP/JSON + login token──▶  Node server (server/)  ─�
    npm start
    ```
    On first start it creates the `pos_retail_pro` database, all tables, an owner account (`owner@pos.com` / `ChangeMe123!` from .env) and demo products/customers. Look at the tables in phpMyAdmin (http://localhost/phpmyadmin).
-3. **App:** `flutter pub get` then `flutter run -d chrome` (or an Android device). Log in with the owner account.
-4. **Real phone:** tap the gear icon on the login screen and enter `http://YOUR-PC-IP:3000` (run `ipconfig`). Allow Node through Windows Firewall. Phone and PC must be on the same Wi-Fi.
+3. **App:** `flutter pub get` then `flutter run -d chrome` (or an Android device). Web and mobile default to `http://192.168.206.31:3000`.
+4. **Real phone:** keep the phone and PC on the same Wi-Fi and allow Node through Windows Firewall. If the PC's IP changes, update the server address using the gear icon on the login screen.
 
 ## How offline + sync works
 - Every sale is saved on the device first, then uploaded. The server ignores a sale it already has, so retries are safe.

@@ -12,10 +12,14 @@ import 'db.dart';
 import 'models.dart';
 import 'theme.dart';
 
-/// Android emulator reaches your PC at 10.0.2.2. Web / iOS simulator use localhost.
-/// Real phone: set your PC's IP (e.g. http://192.168.1.10:3000) with the gear icon on the login screen.
-const defaultApiBase =
-    kIsWeb ? 'http://localhost:3000' : 'http://10.0.2.2:3000';
+/// Set API_BASE_URL at build time for a deployed server. Local web and mobile
+/// clients use this development machine's Wi-Fi address.
+const _configuredApiBase = String.fromEnvironment('API_BASE_URL');
+const _staleLanApiBase = 'http://192.168.1.10:3000';
+const _oldWebApiBase = 'http://localhost:3000';
+const defaultApiBase = _configuredApiBase != ''
+    ? _configuredApiBase
+    : 'http://192.168.206.31:3000';
 const taxRate = 0.18;
 
 class AppState extends ChangeNotifier {
@@ -50,7 +54,14 @@ class AppState extends ChangeNotifier {
     themeColor = Color(_prefs!.getInt('theme') ?? C.blue.toARGB32());
     businessName = _prefs!.getString('bizName') ?? businessName;
     businessType = _prefs!.getString('bizType') ?? businessType;
-    apiBase = _prefs!.getString('apiBase') ?? apiBase;
+    final savedApiBase = _prefs!.getString('apiBase');
+    if (savedApiBase == _staleLanApiBase ||
+        (kIsWeb && savedApiBase == _oldWebApiBase)) {
+      apiBase = defaultApiBase;
+      await _prefs!.setString('apiBase', apiBase);
+    } else {
+      apiBase = savedApiBase ?? apiBase;
+    }
     Api.base = apiBase;
     await _restoreSession();
     await reload(); // local cache = works offline
@@ -89,6 +100,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     if (online) sync();
   }
+
+  String get _connectionError =>
+      'Cannot reach the server. Check that it is running and verify the server address.';
 
   // ───────── session / login ─────────
   bool _expired(String jwt) {
@@ -142,7 +156,7 @@ class AppState extends ChangeNotifier {
     } on ApiException catch (e) {
       return e.message;
     } catch (_) {
-      return 'Cannot reach the server at $apiBase. Is it running?';
+      return _connectionError;
     }
   }
 
@@ -165,7 +179,7 @@ class AppState extends ChangeNotifier {
     } on ApiException catch (e) {
       return e.message;
     } catch (_) {
-      return 'Cannot reach the server at $apiBase. Is it running?';
+      return _connectionError;
     }
   }
 
