@@ -6,7 +6,7 @@ import 'package:sqflite/sqflite.dart';
 import 'models.dart';
 
 /// Android/iOS: SQLite file.  Chrome/Edge (web): browser storage.  Same API for both.
-const seedDemoData = false; // demo data now comes from the server (SEED_DEMO in server/.env)
+const seedDemoData = true; // demo data now comes from the server (SEED_DEMO in server/.env)
 
 class Db {
   static Database? _d;

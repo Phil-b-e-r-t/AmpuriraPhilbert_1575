@@ -6,11 +6,12 @@ Node server is not required for login, sales, inventory, or customers.
 
 ## Firebase setup
 
-1. Create a Firebase project and register the Android, iOS, and web apps you
-   plan to run. In **Authentication > Sign-in method**, enable **Google** and
-   **Email/Password**.
-   The Android package name must match `applicationId` in
-   `android/app/build.gradle.kts` (`com.example.pos_retail_pro` by default).
+1. In your Firebase project, register each platform app you plan to run. In
+   **Authentication > Sign-in method**, enable **Google** and
+   **Email/Password**. The Android package name must match `applicationId` in
+   `android/app/build.gradle.kts` (`com.example.pos_retail_pro`). The iOS
+   bundle ID must match `PRODUCT_BUNDLE_IDENTIFIER` in
+   `ios/Runner.xcodeproj/project.pbxproj` (`com.example.posRetailPro`).
 2. For Android, add your app's SHA-1 and SHA-256 signing fingerprints in the
    Firebase Android app settings. For iOS, register the exact bundle ID used
    by the app. Add your web host (and `localhost` for local development) to
@@ -28,13 +29,15 @@ Node server is not required for login, sales, inventory, or customers.
      "FIREBASE_WEB_APP_ID": "1:123456789:web:abc123",
      "FIREBASE_ANDROID_APP_ID": "1:123456789:android:abc123",
      "FIREBASE_IOS_APP_ID": "1:123456789:ios:abc123",
-     "FIREBASE_IOS_BUNDLE_ID": "com.example.pos_retail_pro"
+     "FIREBASE_IOS_BUNDLE_ID": "com.example.posRetailPro"
    }
    ```
 
    These Firebase app identifiers are public configuration, not service
    account credentials. Do not put service account keys in the Flutter app.
-   The local config file is ignored by Git.
+   The same file provides Firebase options to Flutter on web, Android, and
+   iOS; no Firebase service-account key belongs in the app. The local config
+   file is ignored by Git.
 4. Run with the local configuration:
 
    ```bash

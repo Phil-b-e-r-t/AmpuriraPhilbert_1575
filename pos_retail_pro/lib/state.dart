@@ -111,8 +111,9 @@ class AppState extends ChangeNotifier {
         password: password,
       );
       final user = result.user;
-      if (user == null)
+      if (user == null) {
         return 'Firebase account creation did not return a user.';
+      }
       await user.updateDisplayName(name.trim());
       _applyFirebaseUser(user);
       return null;
