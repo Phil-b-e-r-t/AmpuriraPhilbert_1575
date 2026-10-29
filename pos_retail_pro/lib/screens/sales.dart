@@ -265,6 +265,11 @@ class _PaymentPageState extends State<PaymentPage> {
 
       if (m == 'PayPal' || m == 'Card') {
         // ── PAYPAL FLOW ─────────────────────────────────────────────
+        if (s.apiBase.isEmpty) {
+          context.snack(
+              'Set the PayPal service URL in More > Payment Settings first.');
+          return;
+        }
         if (!s.online) {
           context.snack('PayPal needs internet. Use Cash or Mobile Money while offline.');
           return;

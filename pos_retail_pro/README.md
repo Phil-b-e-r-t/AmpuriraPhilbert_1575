@@ -1,98 +1,104 @@
-# POS Retail Pro (Flutter + PayPal)
+# POS Retail Pro
 
-The API server must be running for login and sign-up. For local development, web and mobile use `http://192.168.206.31:3000` by default so both connect to the same server. This address is specific to this development Wi-Fi network and must be changed if the computer's IP changes. For a deployed server, build with `--dart-define=API_BASE_URL=https://your-server.example.com`.
+POS Retail Pro is a Flutter point-of-sale app with Firebase Authentication and
+local-first data storage. Google and email/password sign-in use Firebase; the
+Node server is not required for login, sales, inventory, or customers.
 
-## 1. Create the project and drop in the code
-```bash
-flutter create pos_retail_pro --org com.yourname --platforms android,ios
-cd pos_retail_pro
-# copy from this zip, replacing the generated files:
-#   pubspec.yaml, lib/ (all files), assets/ , server/
-flutter pub get
-```
-Needs Flutter 3.27 or newer.
+## Firebase setup
 
-## 2. Upload / add your images (put them in assets/images/)
-Export from Figma (select layer > Export > PNG @2x). The app works without them (icons are used instead) but looks like your design with them.
+1. Create a Firebase project and register the Android, iOS, and web apps you
+   plan to run. In **Authentication > Sign-in method**, enable **Google** and
+   **Email/Password**.
+   The Android package name must match `applicationId` in
+   `android/app/build.gradle.kts` (`com.example.pos_retail_pro` by default).
+2. For Android, add your app's SHA-1 and SHA-256 signing fingerprints in the
+   Firebase Android app settings. For iOS, register the exact bundle ID used
+   by the app. Add your web host (and `localhost` for local development) to
+   Firebase Authentication's authorized domains.
+3. Copy the app IDs and project values from Firebase project settings into a
+   local `firebase.env.json` file in this directory:
 
-| File name | Figma layer (node id) |
+   ```json
+   {
+     "FIREBASE_API_KEY": "your-web-api-key",
+     "FIREBASE_MESSAGING_SENDER_ID": "your-sender-id",
+     "FIREBASE_PROJECT_ID": "your-project-id",
+     "FIREBASE_AUTH_DOMAIN": "your-project-id.firebaseapp.com",
+     "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app",
+     "FIREBASE_WEB_APP_ID": "1:123456789:web:abc123",
+     "FIREBASE_ANDROID_APP_ID": "1:123456789:android:abc123",
+     "FIREBASE_IOS_APP_ID": "1:123456789:ios:abc123",
+     "FIREBASE_IOS_BUNDLE_ID": "com.example.pos_retail_pro"
+   }
+   ```
+
+   These Firebase app identifiers are public configuration, not service
+   account credentials. Do not put service account keys in the Flutter app.
+   The local config file is ignored by Git.
+4. Run with the local configuration:
+
+   ```bash
+   flutter pub get
+   flutter run -d chrome --dart-define-from-file=firebase.env.json
+   # Android: flutter run --dart-define-from-file=firebase.env.json
+   ```
+
+   Repeat the `--dart-define-from-file` option when building a release.
+
+New users can select **Continue with Google** or create a Firebase
+email/password account. Firebase remembers a signed-in user on the device, so
+after a successful sign-in the app can reopen and work offline. A first-time
+sign-in still needs internet access.
+
+Signed-in accounts have owner access to inventory stored on that installation.
+Firebase Auth identifies users but does not sync POS records or assign app
+roles.
+
+## Offline storage
+
+Products, customers, stock updates, and sales are saved to SQLite on Android
+and iOS, and to browser storage on web. They remain available offline on that
+device. Data is not synced between devices or backed up to Firebase. Clearing
+the app/browser data removes the local copy. Export or backup is not currently
+provided.
+
+## PayPal (optional)
+
+Cash, card, mobile money, and bank transfer sales are recorded locally.
+PayPal checkout still requires the separate Node service because it creates
+and captures PayPal orders:
+
+1. Create a PayPal app at <https://developer.paypal.com> and obtain its
+   sandbox client ID and secret.
+2. Configure `server/.env` from `server/.env.example`, then run `npm install`
+   and `npm start` in `server/`.
+3. Set the service URL under **More > Payment Settings**. This setting is only
+   needed for PayPal; the app's sign-in and local POS features do not use it.
+
+PayPal does not support UGX. The service converts UGX to USD using
+`UGX_PER_USD`. Check that your business account can receive payments from
+Uganda and withdraw funds before going live. Keep PayPal secrets on the server,
+never in the Flutter app.
+
+## Product images
+
+Place optional images in `assets/images/`. The app uses fallback icons if an
+image is missing.
+
+| File | Use |
 |---|---|
-| coke.png | Product image / coke (18:97) |
-| sprite.png | Product image / sprite (18:104) |
-| water.png | Product image / water (18:112) |
-| bread.png | Product image / bread (18:119) |
-| chips.png | Product image / chips (18:123) |
-| pay_cash.png | Payment Options > Cash icon (I22:352;2:205) |
-| pay_card.png | Credit/Debit Card icon (I22:352;2:210) |
-| pay_momo.png | Mobile Money icon (I22:352;2:214) |
-| pay_bank.png | Bank Transfer icon (I22:352;2:218) |
-| pay_paypal.png | PayPal logo (download from PayPal brand centre) |
-| logo.png (optional) | your business logo |
+| `coke.png`, `sprite.png`, `water.png`, `bread.png`, `chips.png` | Product images |
+| `pay_cash.png`, `pay_card.png`, `pay_momo.png`, `pay_bank.png` | Payment method icons |
+| `pay_paypal.png` | PayPal logo |
+| `logo.png` | Optional business logo |
 
-## 3. PayPal setup
-1. https://developer.paypal.com > Apps & Credentials > Sandbox > Create App. Copy Client ID + Secret.
-2. `cd server && cp .env.example .env`, paste the keys, then `npm install && npm start`.
-3. Android emulator reaches it at http://10.0.2.2:3000 (default in `lib/state.dart`). Real phone: use your PC IP or a deployed https URL, and set it in the app under More > Payment Settings.
-4. Test with a sandbox *personal* buyer account (Dashboard > Sandbox > Accounts).
+## Run and build
 
-IMPORTANT: PayPal does not support UGX. The server converts UGX to USD using UGX_PER_USD (set it to a current rate). Check with PayPal that your business account can receive payments from Uganda and withdraw funds.
-
-## 4. Platform config
-Android `android/app/build.gradle(.kts)`: set `minSdk = 23`.
-Android `AndroidManifest.xml` (inside <manifest>): `<uses-permission android:name="android.permission.INTERNET"/>`
-For local http testing add to <application>: `android:usesCleartextTraffic="true"` (remove for production).
-iOS `ios/Podfile`: `platform :ios, '13.0'`. For local http testing add NSAppTransportSecurity > NSAllowsLocalNetworking = true in Info.plist.
-
-## 5. Run
 ```bash
-flutter run
-```
-Login uses the owner account configured in `server/.env` (defaults: `owner@pos.com` / `ChangeMe123!`); change the default password before use. New users can register from Sign Up while the API server is running.
-
-## Before going live
-- Set `seedDemoData = false` in lib/db.dart.
-- Replace demo login with real auth; add auth (token) to the server endpoints.
-- Deploy server over HTTPS, keep keys only in server env vars, switch PAYPAL_ENV=live.
-- Replace in-memory /sales with a real database.
-- Mobile Money and Bank Transfer are manually confirmed. For automatic MTN/Airtel use their APIs or Flutterwave via the same server pattern.
-
-## Running on Chrome / Edge (web)
-```bash
-flutter run -d chrome      # or: flutter run -d edge
-```
-- Data is stored in the browser (so clearing site data clears the app's data).
-- PayPal opens in a NEW TAB. Approve there, come back, press "Payment received".
-- Keep `cd server && npm start` running; the web app talks to http://localhost:3000.
-- Build for hosting: `flutter build web`.
-
----
-# Version 2: MySQL database + login
-
-```
-Flutter app  ──HTTP/JSON + login token──▶  Node server (server/)  ──▶  MySQL (XAMPP)
- (offline copy on the device)                 + PayPal
+flutter run --dart-define-from-file=firebase.env.json
+flutter build web --dart-define-from-file=firebase.env.json
 ```
 
-## Setup
-1. **XAMPP Control Panel:** click Start next to **MySQL** (Apache is not needed).
-2. **Server:**
-   ```bash
-   cd server
-   npm install
-   copy .env.example .env        # (Mac/Linux: cp)
-   ```
-   Edit `.env`: set `JWT_SECRET` to a long random text, add your PayPal keys. If MySQL has a password, set `DB_PASSWORD`.
-   ```bash
-   npm start
-   ```
-   On first start it creates the `pos_retail_pro` database, all tables, an owner account (`owner@pos.com` / `ChangeMe123!` from .env) and demo products/customers. Look at the tables in phpMyAdmin (http://localhost/phpmyadmin).
-3. **App:** `flutter pub get` then `flutter run -d chrome` (or an Android device). Web and mobile default to `http://192.168.206.31:3000`.
-4. **Real phone:** keep the phone and PC on the same Wi-Fi and allow Node through Windows Firewall. If the PC's IP changes, update the server address using the gear icon on the login screen.
-
-## How offline + sync works
-- Every sale is saved on the device first, then uploaded. The server ignores a sale it already has, so retries are safe.
-- When all sales are uploaded the app downloads the latest products, customers and sales (every 60 s and when the connection returns), so all devices agree.
-- Adding products/customers and editing stock needs a connection (and an owner account for inventory).
-
-## Roles
-`owner` can edit inventory; `cashier` can sell and add customers. New accounts created from the app's **Sign Up** screen are assigned the `cashier` role and signed in automatically. The seeded owner account can create more users (owner token needed): `POST /users {name,email,password,role}`.
+For Android emulator testing of PayPal only, the server can be reached at
+`http://10.0.2.2:3000`. A real phone needs a reachable server URL; use HTTPS in
+production. Mobile Money and Bank Transfer are manually confirmed.

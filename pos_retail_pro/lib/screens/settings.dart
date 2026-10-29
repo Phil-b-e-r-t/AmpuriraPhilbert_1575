@@ -119,7 +119,7 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
       );
 }
 
-// Payment settings: where your PayPal backend lives
+// Payment settings: the optional service used only for PayPal checkout.
 class PaymentSettingsPage extends StatefulWidget {
   const PaymentSettingsPage({super.key});
   @override
@@ -138,9 +138,9 @@ class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
   Widget build(BuildContext context) => Scaffold(
         appBar: appBar(context, 'Payment Settings'),
         body: ListView(padding: const EdgeInsets.all(20), children: [
-          const Text('PayPal server URL', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          const Text('Optional PayPal service URL', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          const Text('The backend in the /server folder that creates and captures PayPal orders. Use https:// in production.',
+          const Text('Only needed for PayPal checkout. Login, inventory, customers, and sales work locally without this service. Use https:// in production.',
               style: TextStyle(fontSize: 12, color: C.grey)),
           const SizedBox(height: 10),
           AppField('https://your-server.com', controller: url, type: TextInputType.url),

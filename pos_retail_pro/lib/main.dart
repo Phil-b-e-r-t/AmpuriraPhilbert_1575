@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'screens/auth.dart';
 import 'screens/home.dart';
 import 'state.dart';
@@ -7,8 +9,22 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  String? firebaseAuthError;
+  if (!FirebaseConfig.isConfigured) {
+    firebaseAuthError =
+        'Firebase is not configured. Follow the Firebase setup steps in README.md.';
+  } else {
+    try {
+      await Firebase.initializeApp(options: FirebaseConfig.currentPlatform);
+    } on FirebaseException catch (error) {
+      firebaseAuthError =
+          'Firebase could not be initialized: ${error.message ?? error.code}';
+    } on UnsupportedError catch (error) {
+      firebaseAuthError = error.message;
+    }
+  }
   final state = AppState();
-  await state.init();
+  await state.init(firebaseAuthError: firebaseAuthError);
   runApp(ChangeNotifierProvider.value(value: state, child: const PosApp()));
 }
 

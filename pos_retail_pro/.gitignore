@@ -49,6 +49,8 @@ app.*.map.json
 **/.env.*
 !.env.example
 !**/.env.example
+firebase.env.json
+**/firebase.env.json
 
 # Local secrets and credentials
 *.pem

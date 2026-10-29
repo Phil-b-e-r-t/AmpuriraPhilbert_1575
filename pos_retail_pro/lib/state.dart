@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -12,14 +11,8 @@ import 'db.dart';
 import 'models.dart';
 import 'theme.dart';
 
-/// Set API_BASE_URL at build time for a deployed server. Local web and mobile
-/// clients use this development machine's Wi-Fi address.
-const _configuredApiBase = String.fromEnvironment('API_BASE_URL');
-const _staleLanApiBase = 'http://192.168.1.10:3000';
-const _oldWebApiBase = 'http://localhost:3000';
-const defaultApiBase = _configuredApiBase != ''
-    ? _configuredApiBase
-    : 'http://192.168.206.31:3000';
+/// The API URL is only used for optional PayPal checkout.
+const defaultApiBase = String.fromEnvironment('API_BASE_URL');
 const taxRate = 0.18;
 
 class AppState extends ChangeNotifier {
@@ -36,6 +29,7 @@ class AppState extends ChangeNotifier {
   bool loggedIn = false;
   String userName = '', userEmail = '', role = 'cashier';
   bool get isOwner => role == 'owner';
+  String? firebaseAuthError;
 
   // settings
   Color themeColor = C.blue;
@@ -43,28 +37,19 @@ class AppState extends ChangeNotifier {
   String businessType = 'Retail Store';
   String apiBase = defaultApiBase;
 
-  static const _secure = FlutterSecureStorage();
   SharedPreferences? _prefs;
   StreamSubscription? _sub;
-  Timer? _timer;
-  bool _syncing = false;
 
-  Future<void> init() async {
+  Future<void> init({String? firebaseAuthError}) async {
+    this.firebaseAuthError = firebaseAuthError;
     _prefs = await SharedPreferences.getInstance();
     themeColor = Color(_prefs!.getInt('theme') ?? C.blue.toARGB32());
     businessName = _prefs!.getString('bizName') ?? businessName;
     businessType = _prefs!.getString('bizType') ?? businessType;
-    final savedApiBase = _prefs!.getString('apiBase');
-    if (savedApiBase == _staleLanApiBase ||
-        (kIsWeb && savedApiBase == _oldWebApiBase)) {
-      apiBase = defaultApiBase;
-      await _prefs!.setString('apiBase', apiBase);
-    } else {
-      apiBase = savedApiBase ?? apiBase;
-    }
+    apiBase = _prefs!.getString('apiBase') ?? apiBase;
     Api.base = apiBase;
     await _restoreSession();
-    await reload(); // local cache = works offline
+    await reload();
     final conn = Connectivity();
     online =
         !(await conn.checkConnectivity()).contains(ConnectivityResult.none);
@@ -73,11 +58,8 @@ class AppState extends ChangeNotifier {
       if (on != online) {
         online = on;
         notifyListeners();
-        if (on) sync();
       }
     });
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) => sync());
-    sync();
   }
 
   Future<void> reload() async {
@@ -90,7 +72,6 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
-    _timer?.cancel();
     super.dispose();
   }
 
@@ -98,104 +79,107 @@ class AppState extends ChangeNotifier {
     online = !(await Connectivity().checkConnectivity())
         .contains(ConnectivityResult.none);
     notifyListeners();
-    if (online) sync();
   }
-
-  String get _connectionError =>
-      'Cannot reach the server. Check that it is running and verify the server address.';
 
   // ───────── session / login ─────────
-  bool _expired(String jwt) {
-    try {
-      final payload = jsonDecode(utf8.decode(
-          base64Url.decode(base64Url.normalize(jwt.split('.')[1])))) as Map;
-      return DateTime.now().millisecondsSinceEpoch / 1000 >=
-          (payload['exp'] as num);
-    } catch (_) {
-      return true;
-    }
-  }
-
-  void _applyUser(Map u) {
-    userName = (u['name'] ?? '') as String;
-    userEmail = (u['email'] ?? '') as String;
-    role = (u['role'] ?? 'cashier') as String;
-  }
-
   Future<void> _restoreSession() async {
-    try {
-      final t = await _secure.read(key: 'token');
-      final u = await _secure.read(key: 'user');
-      if (t != null && u != null && !_expired(t)) {
-        Api.token = t;
-        _applyUser(jsonDecode(u) as Map);
-        loggedIn = true;
-      }
-    } catch (_) {}
+    if (firebaseAuthError != null) return;
+    final user = await FirebaseAuth.instance.authStateChanges().first;
+    if (user != null) _applyFirebaseUser(user);
   }
 
   /// Returns null on success, or an error message to show.
-  Future<String?> login(String email, String password,
-      {bool remember = true}) async {
+  Future<String?> login(String email, String password) async {
+    if (firebaseAuthError != null) return firebaseAuthError;
     try {
-      final r =
-          await Api.post('/auth/login', {'email': email, 'password': password})
-              as Map;
-      Api.token = r['token'] as String;
-      _applyUser(r['user'] as Map);
-      loggedIn = true;
-      if (remember) {
-        await _secure.write(key: 'token', value: Api.token);
-        await _secure.write(key: 'user', value: jsonEncode(r['user']));
-      } else {
-        await _clearStored();
-      }
-      notifyListeners();
-      sync();
+      final result = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email.trim(), password: password);
+      final user = result.user;
+      if (user == null) return 'Firebase sign-in did not return a user.';
+      _applyFirebaseUser(user);
       return null;
-    } on ApiException catch (e) {
-      return e.message;
-    } catch (_) {
-      return _connectionError;
+    } on FirebaseAuthException catch (error) {
+      return _authError(error);
     }
   }
 
   Future<String?> register(String name, String email, String password) async {
+    if (firebaseAuthError != null) return firebaseAuthError;
     try {
-      final r = await Api.post('/auth/register', {
-        'name': name.trim(),
-        'email': email.trim(),
-        'password': password,
-      }) as Map;
-      final user = r['user'] as Map;
-      Api.token = r['token'] as String;
-      _applyUser(user);
-      loggedIn = true;
-      await _secure.write(key: 'token', value: Api.token);
-      await _secure.write(key: 'user', value: jsonEncode(user));
-      notifyListeners();
-      sync();
+      final result = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = result.user;
+      if (user == null)
+        return 'Firebase account creation did not return a user.';
+      await user.updateDisplayName(name.trim());
+      _applyFirebaseUser(user);
       return null;
-    } on ApiException catch (e) {
-      return e.message;
-    } catch (_) {
-      return _connectionError;
+    } on FirebaseAuthException catch (error) {
+      return _authError(error);
     }
   }
 
-  Future<void> _clearStored() async {
+  Future<String?> signInWithGoogle() async {
+    if (firebaseAuthError != null) return firebaseAuthError;
     try {
-      await _secure.delete(key: 'token');
-      await _secure.delete(key: 'user');
-    } catch (_) {}
+      final provider = GoogleAuthProvider();
+      final result = kIsWeb
+          ? await FirebaseAuth.instance.signInWithPopup(provider)
+          : await FirebaseAuth.instance.signInWithProvider(provider);
+      final user = result.user;
+      if (user == null) return 'Google sign-in did not return a user.';
+      _applyFirebaseUser(user);
+      return null;
+    } on FirebaseAuthException catch (error) {
+      return _authError(error);
+    }
+  }
+
+  Future<String?> sendPasswordReset(String email) async {
+    if (firebaseAuthError != null) return firebaseAuthError;
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
+      return null;
+    } on FirebaseAuthException catch (error) {
+      return _authError(error);
+    }
+  }
+
+  String _authError(FirebaseAuthException error) => switch (error.code) {
+        'invalid-email' => 'Enter a valid email address.',
+        'invalid-credential' ||
+        'wrong-password' ||
+        'user-not-found' =>
+          'The email or password is incorrect.',
+        'email-already-in-use' => 'An account already exists for this email.',
+        'weak-password' => 'Choose a stronger password.',
+        'network-request-failed' =>
+          'Connect to the internet to sign in or create an account.',
+        'popup-closed-by-user' ||
+        'cancelled-popup-request' =>
+          'Google sign-in was cancelled.',
+        _ => error.message ?? 'Authentication failed (${error.code}).',
+      };
+
+  void _applyFirebaseUser(User user) {
+    userName = user.displayName?.trim().isNotEmpty == true
+        ? user.displayName!.trim()
+        : (user.email ?? 'User');
+    userEmail = user.email ?? '';
+    role = 'owner';
+    loggedIn = true;
+    Api.token = null;
+    notifyListeners();
   }
 
   Future<void> logout() async {
+    if (firebaseAuthError == null) await FirebaseAuth.instance.signOut();
     Api.token = null;
     loggedIn = false;
     cart.clear();
     customer = null;
-    await _clearStored();
     notifyListeners();
   }
 
@@ -215,7 +199,6 @@ class AppState extends ChangeNotifier {
     Api.base = apiBase;
     await _prefs?.setString('apiBase', apiBase);
     notifyListeners();
-    sync();
   }
 
   void markAllRead() {
@@ -291,118 +274,48 @@ class AppState extends ChangeNotifier {
     cart.clear();
     customer = null;
     notifyListeners();
-    sync(); // does nothing when offline
     return sale;
   }
 
-  int get pendingSync => sales.where((s) => !s.synced).length;
-
-  /// 1) upload sales not yet on the server (safe to repeat)  2) download the latest catalog + sales.
-  Future<void> sync() async {
-    if (!online || !loggedIn || _syncing) return;
-    _syncing = true;
-    try {
-      for (final s in sales.where((x) => !x.synced).toList()) {
-        await Api.post('/sales', s.toJson());
-        s.synced = true;
-        await Db.markSynced(s.id);
-      }
-      await _pull();
-    } on ApiException catch (e) {
-      if (e.status == 401) await logout();
-    } catch (_) {
-      // server unreachable: try again on the next timer tick / reconnect
-    } finally {
-      _syncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> _pull() async {
-    if (sales.any((s) => !s.synced)) {
-      return; // never overwrite stock while sales are waiting
-    }
-    final p = await Api.get('/products') as List;
-    final c = await Api.get('/customers') as List;
-    final s = await Api.get('/sales?days=35') as List;
-    await Db.replaceAll(
-      products: p
-          .map((e) => Product.fromMap(Map<String, Object?>.from(e as Map)))
-          .toList(),
-      customers: c
-          .map((e) => Customer.fromMap(Map<String, Object?>.from(e as Map)))
-          .toList(),
-      sales: s
-          .map((e) => Sale.fromServer(Map<String, dynamic>.from(e as Map)))
-          .toList(),
-    );
-    await reload();
-  }
-
-  // ───────── inventory / customers (need the server; return an error message or null) ─────────
-  String? _needOnline() =>
-      (!online || !loggedIn) ? 'Connect to the internet to change this.' : null;
+  // ───────── inventory / customers (saved locally on this device) ─────────
 
   Future<String?> addProduct(
       String name, int price, int stock, String category) async {
-    final e = _needOnline();
-    if (e != null) return e;
-    try {
-      final j = await Api.post('/products', {
-        'name': name,
-        'price': price,
-        'stock': stock,
-        'category': category
-      }) as Map;
-      final p = Product.fromMap(Map<String, Object?>.from(j));
-      await Db.saveProduct(p);
-      products
-        ..add(p)
-        ..sort((a, b) => a.name.compareTo(b.name));
-      notifyListeners();
-      return null;
-    } on ApiException catch (x) {
-      return x.message;
-    } catch (_) {
-      return 'Server not reachable.';
-    }
+    final product = Product(
+      id: const Uuid().v4(),
+      name: name,
+      price: price,
+      stock: stock,
+      category: category,
+    );
+    await Db.saveProduct(product);
+    products
+      ..add(product)
+      ..sort((a, b) => a.name.compareTo(b.name));
+    notifyListeners();
+    return null;
   }
 
   Future<String?> updateStock(Product p, int stock) async {
-    final e = _needOnline();
-    if (e != null) return e;
-    try {
-      await Api.put('/products/${p.id}', {'stock': stock});
-      final cur = products.firstWhere((x) => x.id == p.id, orElse: () => p);
-      cur.stock = stock;
-      await Db.saveProduct(cur);
-      notifyListeners();
-      return null;
-    } on ApiException catch (x) {
-      return x.message;
-    } catch (_) {
-      return 'Server not reachable.';
-    }
+    p.stock = stock;
+    await Db.saveProduct(p);
+    notifyListeners();
+    return null;
   }
 
   Future<String?> addCustomer(String name, String phone, String email) async {
-    final e = _needOnline();
-    if (e != null) return e;
-    try {
-      final j = await Api.post(
-          '/customers', {'name': name, 'phone': phone, 'email': email}) as Map;
-      final c = Customer.fromMap(Map<String, Object?>.from(j));
-      await Db.saveCustomer(c);
-      customers
-        ..add(c)
-        ..sort((a, b) => a.name.compareTo(b.name));
-      notifyListeners();
-      return null;
-    } on ApiException catch (x) {
-      return x.message;
-    } catch (_) {
-      return 'Server not reachable.';
-    }
+    final customer = Customer(
+      id: const Uuid().v4(),
+      name: name,
+      phone: phone,
+      email: email,
+    );
+    await Db.saveCustomer(customer);
+    customers
+      ..add(customer)
+      ..sort((a, b) => a.name.compareTo(b.name));
+    notifyListeners();
+    return null;
   }
 
   // ───────── reports (computed from the synced local copy) ─────────

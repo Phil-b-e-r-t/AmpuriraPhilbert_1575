@@ -31,7 +31,7 @@ class _HomeShellState extends State<HomeShell> {
               width: double.infinity,
               color: C.amber,
               padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 6, bottom: 6),
-              child: const Text('Working offline... sales will update automatically',
+              child: const Text('Offline • sales and updates are saved on this device',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
             ),

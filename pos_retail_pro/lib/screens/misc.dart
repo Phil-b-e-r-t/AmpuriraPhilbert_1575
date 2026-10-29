@@ -27,7 +27,7 @@ void showNotifications(BuildContext context) {
         const Divider(height: 1, color: C.border),
         row(Icons.credit_card, 'Payment received', 'UGX 120,000 via Card', '15m ago'),
         const Divider(height: 1, color: C.border),
-        row(Icons.check, 'Sync complete', 'All offline sales uploaded', '1h ago'),
+        row(Icons.check, 'Local data saved', 'Sales are stored on this device', '1h ago'),
         const SizedBox(height: 14),
         Builder(
             builder: (ctx) => PrimaryButton('Mark all as read', outlined: true, onTap: () {
@@ -55,7 +55,7 @@ class OfflinePage extends StatelessWidget {
           Text(s.online ? "You're back online" : "You're Offline", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           const SizedBox(height: 14),
           const Text(
-              'No internet connection detected. You can keep making sales — they are saved on this phone and sync automatically when you are back online.',
+              'Your products, customers, and sales are stored on this device and remain available offline. Sign in while online at least once. Internet is also needed for PayPal payments.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: C.grey, height: 1.5)),
           const SizedBox(height: 24),
@@ -65,7 +65,10 @@ class OfflinePage extends StatelessWidget {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.check_circle, size: 18, color: C.green),
               const SizedBox(width: 8),
-              Text('Working Offline • ${s.pendingSync} waiting to sync', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.green)),
+              Text(
+                s.online ? 'Internet connection available' : 'Local data is ready',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.green),
+              ),
             ]),
           ),
           const Spacer(),

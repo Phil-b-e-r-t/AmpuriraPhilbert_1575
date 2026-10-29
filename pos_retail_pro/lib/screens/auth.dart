@@ -4,64 +4,6 @@ import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-Future<void> _showServerDialog(BuildContext context) async {
-  final state = context.read<AppState>();
-  final controller = TextEditingController(text: state.apiBase);
-  final saved = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-            title: const Text('Server address'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text(
-                  'On this Wi-Fi, use http://192.168.206.31:3000. Keep your phone and computer on the same network, start the server on your computer, and allow Node through Windows Firewall.'),
-              const SizedBox(height: 12),
-              TextField(
-                  controller: controller,
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                      hintText: 'http://192.168.1.10:3000')),
-            ]),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
-              TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Save')),
-            ],
-          ));
-
-  if (saved == true) {
-    final uri = Uri.tryParse(controller.text.trim());
-    if (uri == null ||
-        uri.host.isEmpty ||
-        (uri.scheme != 'http' && uri.scheme != 'https')) {
-      if (context.mounted) {
-        context.snack(
-            'Enter a complete server URL starting with http:// or https://');
-      }
-    } else {
-      await state.saveApiBase(uri.toString());
-    }
-  }
-  controller.dispose();
-}
-
-void _showAuthError(BuildContext context, String message) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(
-      content: Text(message),
-      action: message.startsWith('Cannot reach the server.')
-          ? SnackBarAction(
-              label: 'Server settings',
-              onPressed: () => _showServerDialog(context))
-          : null,
-    ));
-}
-
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
@@ -113,7 +55,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _id = TextEditingController();
   final _pw = TextEditingController();
-  bool _hide = true, _remember = true, _busy = false;
+  bool _hide = true, _busy = false;
 
   @override
   void dispose() {
@@ -125,24 +67,42 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _login() async {
     final id = _id.text.trim();
     if (id.isEmpty || _pw.text.isEmpty) {
-      context.snack('Enter your email/phone and password');
+      context.snack('Enter your email and password.');
       return;
     }
     setState(() => _busy = true);
-    final err =
-        await context.read<AppState>().login(id, _pw.text, remember: _remember);
+    final err = await context.read<AppState>().login(id, _pw.text);
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      _showAuthError(context, err);
+      context.snack(err);
       return;
     }
     // main.dart now swaps the first screen to the app; just close the login page.
     Navigator.popUntil(context, (r) => r.isFirst);
   }
 
-  Future<void> _serverDialog() async {
-    await _showServerDialog(context);
+  Future<void> _googleLogin() async {
+    setState(() => _busy = true);
+    final error = await context.read<AppState>().signInWithGoogle();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (error != null) {
+      context.snack(error);
+      return;
+    }
+    Navigator.popUntil(context, (r) => r.isFirst);
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _id.text.trim();
+    if (email.isEmpty) {
+      context.snack('Enter your email address first.');
+      return;
+    }
+    final error = await context.read<AppState>().sendPasswordReset(email);
+    if (!mounted) return;
+    context.snack(error ?? 'Password reset email sent.');
   }
 
   Widget _social(String label, IconData icon) => Padding(
@@ -151,8 +111,8 @@ class _LoginPageState extends State<LoginPage> {
             icon: icon,
             outlined: true,
             color: C.text,
-            onTap: () =>
-                context.snack('Connect Firebase Auth to enable $label')),
+            loading: _busy,
+            onTap: _busy ? null : _googleLogin),
       );
 
   void _openSignup() => Navigator.push(
@@ -165,13 +125,7 @@ class _LoginPageState extends State<LoginPage> {
             elevation: 0,
             leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context)),
-            actions: [
-              IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  tooltip: 'Server address',
-                  onPressed: _serverDialog)
-            ]),
+                onPressed: () => Navigator.pop(context))),
         body: SafeArea(
           child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -182,6 +136,14 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 6),
                 const Text('Sign in to your account',
                     style: TextStyle(fontSize: 12, color: C.grey)),
+                if (context.watch<AppState>().firebaseAuthError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Text(
+                      context.watch<AppState>().firebaseAuthError!,
+                      style: const TextStyle(fontSize: 12, color: C.red),
+                    ),
+                  ),
                 const SizedBox(height: 24),
                 AppField('Email',
                     icon: Icons.mail_outline,
@@ -201,19 +163,9 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: () => setState(() => _hide = !_hide))),
                 const SizedBox(height: 10),
                 Row(children: [
-                  SizedBox(
-                      width: 24,
-                      child: Checkbox(
-                          value: _remember,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: (v) =>
-                              setState(() => _remember = v ?? true))),
-                  const SizedBox(width: 8),
-                  const Text('Remember me', style: TextStyle(fontSize: 12)),
                   const Spacer(),
                   InkWell(
-                      onTap: () => context
-                          .snack('Password reset: connect your auth backend'),
+                      onTap: _busy ? null : _forgotPassword,
                       borderRadius: BorderRadius.circular(4),
                       hoverColor: context.primary.withValues(alpha: .08),
                       child: Text('Forgot password?',
@@ -236,7 +188,6 @@ class _LoginPageState extends State<LoginPage> {
                 ]),
                 const SizedBox(height: 22),
                 _social('Continue with Google', Icons.g_mobiledata),
-                _social('Continue with Apple', Icons.apple),
                 const SizedBox(height: 24),
                 Center(
                     child: InkWell(
@@ -314,7 +265,7 @@ class _SignupPageState extends State<SignupPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (error != null) {
-      _showAuthError(context, error);
+      context.snack(error);
       return;
     }
     Navigator.popUntil(context, (route) => route.isFirst);
@@ -329,12 +280,6 @@ class _SignupPageState extends State<SignupPage> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context),
           ),
-          actions: [
-            IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                tooltip: 'Server address',
-                onPressed: () => _showServerDialog(context)),
-          ],
         ),
         body: SafeArea(
           child: ListView(
