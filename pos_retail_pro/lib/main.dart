@@ -21,6 +21,9 @@ Future<void> main() async {
           'Firebase could not be initialized: ${error.message ?? error.code}';
     } on UnsupportedError catch (error) {
       firebaseAuthError = error.message;
+    } catch (error) {
+      // Never let a Firebase problem stop the app from opening (offline safe).
+      firebaseAuthError = 'Firebase could not be initialized: $error';
     }
   }
   final state = AppState();

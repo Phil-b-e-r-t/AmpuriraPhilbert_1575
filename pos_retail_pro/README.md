@@ -54,6 +54,32 @@ Signed-in accounts have owner access to inventory stored on that installation.
 Firebase Auth identifies users but does not sync POS records or assign app
 roles.
 
+## Deploy to Vercel (web)
+
+Vercel does not include Flutter, so `vercel.json` + `vercel_build.sh` download
+the Flutter SDK during the build and run `flutter build web`.
+
+1. In Vercel, import the GitHub repo. Either leave **Root Directory** empty
+   (the `vercel.json` at the repo root handles the subfolder) or set it to
+   `pos_retail_pro`. Leave the Framework Preset as **Other**.
+2. Under **Settings > Environment Variables** add these (all are public Firebase
+   web config values, copy them from Firebase **Project settings > Your apps > Web app**):
+
+   | Name | Required |
+   |---|---|
+   | `FIREBASE_API_KEY` | yes |
+   | `FIREBASE_MESSAGING_SENDER_ID` | yes |
+   | `FIREBASE_PROJECT_ID` | yes |
+   | `FIREBASE_AUTH_DOMAIN` | yes (`<project-id>.firebaseapp.com`) |
+   | `FIREBASE_WEB_APP_ID` | yes (`1:...:web:...`) |
+   | `FIREBASE_STORAGE_BUCKET` | optional |
+   | `API_BASE_URL` | optional, only for PayPal |
+3. Deploy. Then add your Vercel domain (e.g. `your-app.vercel.app`) in Firebase
+   **Authentication > Settings > Authorized domains**, otherwise Google sign-in
+   shows an `unauthorized-domain` error.
+
+The first build takes several minutes because Flutter is downloaded each time.
+
 ## Offline storage
 
 Products, customers, stock updates, and sales are saved to SQLite on Android
@@ -61,6 +87,9 @@ and iOS, and to browser storage on web. They remain available offline on that
 device. Data is not synced between devices or backed up to Firebase. Clearing
 the app/browser data removes the local copy. Export or backup is not currently
 provided.
+
+On web, open the deployed site once while online so the browser can cache the
+app. After that it opens offline (the web build bundles CanvasKit locally).
 
 ## PayPal (optional)
 

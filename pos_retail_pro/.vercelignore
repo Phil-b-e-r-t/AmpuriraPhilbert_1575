@@ -1,0 +1,9 @@
+android
+ios
+macos
+windows
+linux
+server
+build
+.dart_tool
+firebase.env.json
