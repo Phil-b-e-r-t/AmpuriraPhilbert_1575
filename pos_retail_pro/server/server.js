@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { init, q, getPool } = require('./db');
+const { verifyFirebaseToken } = require('./firebaseAuth');
 
 const {
   JWT_SECRET, JWT_EXPIRES = '24h', PORT = 3000,
@@ -32,6 +33,20 @@ function auth(req, res, next) {
   if (!t) return res.status(401).json({ error: 'Login required' });
   try { req.user = jwt.verify(t, JWT_SECRET); next(); }
   catch { res.status(401).json({ error: 'Session expired. Please log in again.' }); }
+}
+
+// Accepts EITHER this server's own login token OR a Firebase ID token (the app now signs in with Firebase).
+// Used by the PayPal routes so PayPal works for Firebase users.
+async function authAny(req, res, next) {
+  const h = req.headers.authorization || '';
+  const t = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (!t) return res.status(401).json({ error: 'Login required' });
+  try { req.user = jwt.verify(t, JWT_SECRET); return next(); } catch { /* not a server token, try Firebase */ }
+  try { req.user = await verifyFirebaseToken(t); return next(); }
+  catch (e) {
+    console.error('Firebase token rejected:', e.message);
+    return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+  }
 }
 const owner = (req, res, next) => (req.user.role === 'owner' ? next() : res.status(403).json({ error: 'Owner access only' }));
 
@@ -199,7 +214,7 @@ async function paypalToken() {
   return j.access_token;
 }
 
-app.post('/paypal/orders', auth, async (req, res) => {
+app.post('/paypal/orders', authAny, async (req, res) => {
   try {
     const { amountUgx, reference, returnUrl, cancelUrl } = req.body;
     if (!Number.isFinite(amountUgx) || amountUgx <= 0) return res.status(400).json({ error: 'Invalid amount' });
@@ -223,7 +238,7 @@ app.post('/paypal/orders', auth, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'PayPal order failed' }); }
 });
 
-app.post('/paypal/orders/:id/capture', auth, async (req, res) => {
+app.post('/paypal/orders/:id/capture', authAny, async (req, res) => {
   try {
     const token = await paypalToken();
     const r = await fetch(`${PP}/v2/checkout/orders/${encodeURIComponent(req.params.id)}/capture`, {
