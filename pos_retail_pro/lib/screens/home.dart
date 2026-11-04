@@ -6,8 +6,11 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'inventory.dart';
 import 'misc.dart';
+import 'promotions.dart';
+import 'receipt.dart';
 import 'reports.dart';
 import 'sales.dart';
+import 'scanner.dart';
 import 'settings.dart';
 
 class HomeShell extends StatefulWidget {
@@ -80,6 +83,7 @@ class HomePage extends StatelessWidget {
     final yesterday = s.totalSince(today.subtract(const Duration(days: 1)), today);
     final pct = yesterday == 0 ? 0 : ((todayTotal - yesterday) / yesterday * 100).round();
     final greet = now.hour < 12 ? 'Good morning' : now.hour < 17 ? 'Good afternoon' : 'Good evening';
+    void openReports() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsPage()));
 
     Widget tile(IconData i, String label, VoidCallback onTap) => Expanded(
           child: GestureDetector(
@@ -116,6 +120,7 @@ class HomePage extends StatelessWidget {
               label: Text('${s.unread}'),
               child: IconButton(
                   icon: const Icon(Icons.notifications_none),
+                  tooltip: 'Alerts',
                   onPressed: () => showNotifications(context)),
             ),
             const SizedBox(width: 6),
@@ -159,37 +164,58 @@ class HomePage extends StatelessWidget {
           ]),
           const SizedBox(height: 10),
           Row(children: [
+            tile(Icons.qr_code_scanner, 'Scan & Sell', () => openSaleScanner(context)),
+            const SizedBox(width: 10),
+            tile(Icons.price_check, 'Price Check', () => openPriceCheck(context)),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
             tile(Icons.people_outline, 'Customers', () => onGo(3)),
             const SizedBox(width: 10),
-            tile(Icons.bar_chart, 'Reports',
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsPage()))),
+            if (s.isOwner)
+              tile(Icons.bar_chart, 'Reports', openReports)
+            else
+              tile(Icons.notifications_none, 'Alerts', () => showNotifications(context)),
           ]),
+          if (s.isOwner) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              tile(Icons.local_offer_outlined, 'Promotions',
+                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PromotionsPage()))),
+              const SizedBox(width: 10),
+              tile(Icons.notifications_none, 'Alerts', () => showNotifications(context)),
+            ]),
+          ],
           const SizedBox(height: 22),
           Row(children: [
             const Expanded(
                 child: Text('Recent Transactions',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
-            GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsPage())),
-                child: Text('View All',
-                    style: TextStyle(fontSize: 12, color: context.primary, fontWeight: FontWeight.w600))),
+            if (s.isOwner)
+              GestureDetector(
+                  onTap: openReports,
+                  child: Text('View All',
+                      style: TextStyle(fontSize: 12, color: context.primary, fontWeight: FontWeight.w600))),
           ]),
           const SizedBox(height: 8),
           for (final x in s.sales.take(3)) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(children: [
-                MethodIcon(x.method, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Text(x.method == 'Cash' ? 'Cash Sale' : x.method == 'Card' ? 'Card Payment' : x.method,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text(ugx(x.total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  Text(DateFormat('hh:mm a').format(x.created),
-                      style: const TextStyle(fontSize: 11, color: C.grey)),
+            InkWell(
+              onTap: () => showReceipt(context, x, s.businessName),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(children: [
+                  MethodIcon(x.method, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Text(x.method == 'Cash' ? 'Cash Sale' : x.method == 'Card' ? 'Card Payment' : x.method,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text(ugx(x.total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(DateFormat('hh:mm a').format(x.created),
+                        style: const TextStyle(fontSize: 11, color: C.grey)),
+                  ]),
                 ]),
-              ]),
+              ),
             ),
             const Divider(height: 1, color: C.border),
           ],

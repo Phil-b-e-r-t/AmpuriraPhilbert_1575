@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'promotions.dart';
+import 'staff.dart';
 
-// ───────────────────────── 10. Settings ─────────────────────────
+// ─────────────────────── 10. Settings ───────────────────────
 class SettingsPage extends StatelessWidget {
   final bool tab;
   const SettingsPage({super.key, this.tab = false});
@@ -20,7 +22,6 @@ class SettingsPage extends StatelessWidget {
               onTap: onTap),
           const Divider(height: 1, color: C.border, indent: 20, endIndent: 20),
         ]);
-    void soon(String t) => context.snack('$t — coming soon');
     void go(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
 
     return Scaffold(
@@ -39,13 +40,17 @@ class SettingsPage extends StatelessWidget {
           ]),
         ),
         const Divider(height: 1, color: C.border),
-        item(Icons.storefront_outlined, 'Business Profile', () => go(const BusinessProfilePage())),
-        item(Icons.credit_card, 'Payment Settings', () => go(const PaymentSettingsPage())),
-        item(Icons.inventory_2_outlined, 'Inventory Settings', () => soon('Inventory settings')),
-        item(Icons.people_outline, 'User Management', () => soon('User management')),
-        item(Icons.tune, 'App Preferences', () => soon('App preferences')),
-        item(Icons.shield_outlined, 'Security & Privacy', () => soon('Security & privacy')),
-        item(Icons.info_outline, 'About', () => showAboutDialog(context: context, applicationName: 'POS Retail Pro', applicationVersion: '1.0.0')),
+        if (s.isOwner) ...[
+          item(Icons.storefront_outlined, 'Business Profile', () => go(const BusinessProfilePage())),
+          item(Icons.credit_card, 'Payment Methods', () => go(const PaymentMethodsPage())),
+          item(Icons.local_offer_outlined, 'Promotions & Discounts', () => go(const PromotionsPage())),
+          item(Icons.people_outline, 'Staff & Roles', () => go(const StaffPage())),
+        ],
+        item(Icons.lock_reset, 'Change Password', () async {
+          final err = await context.read<AppState>().sendPasswordReset(s.userEmail);
+          if (context.mounted) context.snack(err ?? 'Password reset email sent to ${s.userEmail}');
+        }),
+        item(Icons.info_outline, 'About', () => showAboutDialog(context: context, applicationName: 'POS Retail Pro', applicationVersion: '1.1.0')),
         Padding(
           padding: const EdgeInsets.all(20),
           child: PrimaryButton('Log out', outlined: true, color: C.red, onTap: () async {
@@ -58,7 +63,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// ───────────────────────── 12. Business Profile ─────────────────────────
+// ─────────────────────── 12. Business Profile ───────────────────────
 class BusinessProfilePage extends StatefulWidget {
   const BusinessProfilePage({super.key});
   @override
@@ -119,36 +124,38 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
       );
 }
 
-// Payment settings: the optional service used only for PayPal checkout.
-class PaymentSettingsPage extends StatefulWidget {
-  const PaymentSettingsPage({super.key});
-  @override
-  State<PaymentSettingsPage> createState() => _PaymentSettingsPageState();
-}
+/// Which payment methods the cashier can choose at the till.
+/// Server addresses, keys and database settings are NOT shown here: they are configured
+/// on the backend / at build time and are never visible to the app user.
+class PaymentMethodsPage extends StatelessWidget {
+  const PaymentMethodsPage({super.key});
 
-class _PaymentSettingsPageState extends State<PaymentSettingsPage> {
-  late final url = TextEditingController(text: context.read<AppState>().apiBase);
+  static const _desc = {
+    'Cash': 'Always available',
+    'Card': 'Credit / debit card',
+    'Mobile Money': 'MTN / Airtel',
+    'Bank Transfer': 'Confirm when the transfer arrives',
+    'PayPal': 'Online payment',
+  };
+
   @override
-  void dispose() {
-    url.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    final s = context.watch<AppState>();
+    return Scaffold(
+      appBar: appBar(context, 'Payment Methods'),
+      body: ListView(padding: const EdgeInsets.symmetric(vertical: 8), children: [
+        const Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: Text('Choose the ways customers can pay at the till.', style: TextStyle(fontSize: 12, color: C.grey))),
+        for (final m in s.backendMethods)
+          SwitchListTile(
+            secondary: Icon(methodIcon(m), color: C.grey),
+            title: Text(m, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            subtitle: Text(_desc[m] ?? '', style: const TextStyle(fontSize: 11)),
+            value: s.isMethodEnabled(m),
+            onChanged: m == 'Cash' ? null : (v) => s.setMethodEnabled(m, v),
+          ),
+      ]),
+    );
   }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: appBar(context, 'Payment Settings'),
-        body: ListView(padding: const EdgeInsets.all(20), children: [
-          const Text('Optional PayPal service URL', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          const Text('Only needed for PayPal checkout. Login, inventory, customers, and sales work locally without this service. Use https:// in production.',
-              style: TextStyle(fontSize: 12, color: C.grey)),
-          const SizedBox(height: 10),
-          AppField('https://your-server.com', controller: url, type: TextInputType.url),
-          const SizedBox(height: 20),
-          PrimaryButton('Save', onTap: () async {
-            await context.read<AppState>().saveApiBase(url.text);
-            if (context.mounted) context.snack('Saved');
-          }),
-        ]),
-      );
 }
