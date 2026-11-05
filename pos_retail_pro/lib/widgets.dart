@@ -3,128 +3,150 @@ import 'theme.dart';
 
 extension Ctx on BuildContext {
   Color get primary => Theme.of(this).colorScheme.primary;
+  bool get wide => MediaQuery.sizeOf(this).width >= kWideBreakpoint;
   void snack(String m) => ScaffoldMessenger.of(this)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(m)));
 }
 
-PreferredSizeWidget appBar(BuildContext c, String title,
-        {bool back = true, List<Widget>? actions}) =>
-    AppBar(
+PreferredSizeWidget appBar(BuildContext c, String title, {bool back = true, List<Widget>? actions}) => AppBar(
       automaticallyImplyLeading: false,
-      leading: back
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.maybePop(c))
-          : null,
-      title: Text(title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+      leading: back ? IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => Navigator.maybePop(c)) : null,
+      title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -.2)),
       centerTitle: false,
       titleSpacing: back ? 0 : 20,
       backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      actions: actions,
-      bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: C.border)),
+      actions: [...?actions, const SizedBox(width: 4)],
+      bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: C.border)),
     );
 
-class PrimaryButton extends StatefulWidget {
+/// Keeps content readable on large screens by limiting its width and centering it.
+class Centered extends StatelessWidget {
+  final Widget child;
+  final double maxWidth;
+  const Centered({super.key, required this.child, this.maxWidth = 960});
+  @override
+  Widget build(BuildContext context) =>
+      Align(alignment: Alignment.topCenter, child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child));
+}
+
+/// White, flat, softly-rounded surface: the basic building block of every screen.
+class AppCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+  final Color? color, borderColor;
+  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.onTap, this.color, this.borderColor});
+  @override
+  Widget build(BuildContext context) => Material(
+        color: color ?? Colors.white,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: borderColor ?? C.border)),
+        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+      );
+}
+
+class SectionTitle extends StatelessWidget {
+  final String text;
+  final Widget? trailing;
+  const SectionTitle(this.text, {super.key, this.trailing});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Row(children: [
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -.2))),
+          if (trailing != null) trailing!,
+        ]),
+      );
+}
+
+/// Small coloured badge (category, stock status, promo).
+class Pill extends StatelessWidget {
+  final String text;
+  final Color color;
+  const Pill(this.text, this.color, {super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(color: color.withValues(alpha: .12), borderRadius: BorderRadius.circular(20)),
+        child: Text(text, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+      );
+}
+
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title, message;
+  const EmptyState(this.icon, this.title, this.message, {super.key});
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(color: context.primary.withValues(alpha: .08), shape: BoxShape.circle),
+                child: Icon(icon, size: 30, color: context.primary)),
+            const SizedBox(height: 16),
+            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, color: C.grey, height: 1.45)),
+          ]),
+        ),
+      );
+}
+
+class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final IconData? icon;
   final bool outlined, loading;
   final Color? color;
+  final double height;
   const PrimaryButton(this.label,
-      {super.key,
-      this.onTap,
-      this.icon,
-      this.outlined = false,
-      this.loading = false,
-      this.color});
-
-  @override
-  State<PrimaryButton> createState() => _PrimaryButtonState();
-}
-
-class _PrimaryButtonState extends State<PrimaryButton> {
-  bool _hovered = false;
+      {super.key, this.onTap, this.icon, this.outlined = false, this.loading = false, this.color, this.height = 50});
 
   @override
   Widget build(BuildContext context) {
-    final active = widget.onTap != null && !widget.loading;
-    final baseColor = widget.color ?? context.primary;
-    final child = widget.loading
-        ? const SizedBox(
-            width: 20,
-            height: 20,
-            child:
-                CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+    final active = onTap != null && !loading;
+    final base = color ?? context.primary;
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    const textStyle = TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: .1);
+    final child = loading
+        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: outlined ? base : Colors.white))
         : Row(mainAxisSize: MainAxisSize.min, children: [
-            if (widget.icon != null) ...[
-              Icon(widget.icon, size: 18),
-              const SizedBox(width: 8)
-            ],
-            Text(widget.label,
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
+            Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
           ]);
-    final shape =
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(8));
-    return MouseRegion(
-      cursor: active ? SystemMouseCursors.click : SystemMouseCursors.basic,
-      onEnter: active ? (_) => setState(() => _hovered = true) : null,
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: _hovered && active
-              ? [
-                  BoxShadow(
-                    color: baseColor.withValues(alpha: .22),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : const [],
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: widget.outlined
-              ? OutlinedButton(
-                  onPressed: active ? widget.onTap : null,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: baseColor,
-                    backgroundColor: _hovered && active
-                        ? baseColor.withValues(alpha: .08)
-                        : Colors.transparent,
-                    overlayColor: baseColor.withValues(alpha: .1),
-                    side: BorderSide(
-                        color: _hovered && active
-                            ? baseColor
-                            : widget.color == null
-                                ? context.primary
-                                : C.border),
-                    shape: shape,
-                  ),
-                  child: child)
-              : ElevatedButton(
-                  onPressed: active ? widget.onTap : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _hovered && active
-                        ? Color.lerp(context.primary, Colors.black, .1)
-                        : context.primary,
-                    foregroundColor: Colors.white,
-                    overlayColor: Colors.white.withValues(alpha: .12),
-                    elevation: _hovered && active ? 2 : 0,
-                    shape: shape,
-                  ),
-                  child: child),
-        ),
-      ),
+    return SizedBox(
+      width: double.infinity,
+      height: height,
+      child: outlined
+          ? OutlinedButton(
+              onPressed: active ? onTap : null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: base,
+                backgroundColor: Colors.white,
+                side: BorderSide(color: color == null ? base.withValues(alpha: .45) : C.border),
+                shape: shape,
+                textStyle: textStyle,
+              ),
+              child: child)
+          : FilledButton(
+              onPressed: active ? onTap : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: base,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: C.border,
+                disabledForegroundColor: C.grey,
+                elevation: 0,
+                shape: shape,
+                textStyle: textStyle,
+              ),
+              child: child),
     );
   }
 }
@@ -136,38 +158,33 @@ class AppField extends StatelessWidget {
   final bool obscure;
   final Widget? suffix;
   final TextInputType? type;
-  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onChanged, onSubmitted;
   const AppField(this.hint,
-      {super.key,
-      this.icon,
-      this.controller,
-      this.obscure = false,
-      this.suffix,
-      this.type,
-      this.onChanged});
+      {super.key, this.icon, this.controller, this.obscure = false, this.suffix, this.type, this.onChanged, this.onSubmitted});
 
   @override
   Widget build(BuildContext context) {
-    OutlineInputBorder b(Color c) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: c));
+    OutlineInputBorder b(Color c, [double w = 1]) =>
+        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
     return TextField(
       controller: controller,
       obscureText: obscure,
       keyboardType: type,
       onChanged: onChanged,
-      style: const TextStyle(fontSize: 13),
+      onSubmitted: onSubmitted,
+      style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: C.grey, fontSize: 13),
-        prefixIcon: icon == null ? null : Icon(icon, size: 18, color: C.grey),
+        hintStyle: const TextStyle(color: C.grey, fontSize: 14),
+        prefixIcon: icon == null ? null : Icon(icon, size: 20, color: C.grey),
         suffixIcon: suffix,
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
         enabledBorder: b(C.border),
         border: b(C.border),
-        focusedBorder: b(context.primary),
+        focusedBorder: b(context.primary, 1.6),
       ),
     );
   }
@@ -179,107 +196,78 @@ class FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.only(bottom: 6, top: 14),
-      child: Text(t,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)));
+      child: Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.grey)));
 }
 
-/// Pill tabs (inventory tabs, report tabs, range tabs)
+/// Segmented control (inventory filters, report tabs, ranges).
 class SegTabs extends StatelessWidget {
   final List<String> labels;
   final int index;
   final ValueChanged<int> onChanged;
   const SegTabs(this.labels, this.index, this.onChanged, {super.key});
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: const Color(0xFFE5EAF1), borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
           for (var i = 0; i < labels.length; i++)
             Expanded(
-              child: _SegTab(
-                  label: labels[i],
-                  selected: i == index,
-                  isLast: i == labels.length - 1,
-                  onTap: () => onChanged(i)),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChanged(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: i == index ? Colors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
+                      boxShadow: i == index
+                          ? const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))]
+                          : const [],
+                    ),
+                    child: Text(labels[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: i == index ? C.text : C.grey)),
+                  ),
+                ),
+              ),
             ),
-        ],
+        ]),
       );
 }
 
-class _SegTab extends StatefulWidget {
-  final String label;
-  final bool selected, isLast;
-  final VoidCallback onTap;
-  const _SegTab(
-      {required this.label,
-      required this.selected,
-      required this.isLast,
-      required this.onTap});
-
-  @override
-  State<_SegTab> createState() => _SegTabState();
-}
-
-class _SegTabState extends State<_SegTab> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            margin: EdgeInsets.only(right: widget.isLast ? 0 : 8),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: widget.selected
-                  ? (_hovered
-                      ? Color.lerp(context.primary, Colors.black, .08)
-                      : context.primary)
-                  : _hovered
-                      ? context.primary.withValues(alpha: .08)
-                      : C.bg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color:
-                      widget.selected || _hovered ? context.primary : C.border),
-            ),
-            child: Text(widget.label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: widget.selected ? Colors.white : C.grey)),
-          ),
-        ),
-      );
-}
-
-/// Product picture. UPLOAD your exported PNGs to assets/images/ (see README).
+/// Product picture. Falls back to a coloured tile with the product's first letter.
 class ProductImage extends StatelessWidget {
-  final String path;
+  final String path, name;
   final double w, h;
-  const ProductImage(this.path, {super.key, this.w = 32, this.h = 56});
+  const ProductImage(this.path, {super.key, this.w = 32, this.h = 56, this.name = ''});
   @override
   Widget build(BuildContext context) {
-    final assetPath = path == 'assets/images/coca.png'
-        ? 'assets/images/coke.png'
-        : path;
+    final assetPath = path == 'assets/images/coca.png' ? 'assets/images/coke.png' : path;
     return SizedBox(
       width: w,
       height: h,
       child: assetPath.isEmpty
-          ? _fallback()
-          : Image.asset(assetPath,
-              fit: BoxFit.contain, errorBuilder: (_, __, ___) => _fallback()),
+          ? _fallback(context)
+          : Image.asset(assetPath, fit: BoxFit.contain, errorBuilder: (_, __, ___) => _fallback(context)),
     );
   }
-  Widget _fallback() => Container(
-        decoration:
-            BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(6)),
-        child: const Icon(Icons.inventory_2_outlined, size: 18, color: C.grey),
-      );
+
+  Widget _fallback(BuildContext context) {
+    final side = (w.isFinite ? w : 60) < (h.isFinite ? h : 60) ? (w.isFinite ? w : 60) : (h.isFinite ? h : 60);
+    return Container(
+      decoration: BoxDecoration(color: context.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)),
+      alignment: Alignment.center,
+      child: name.isEmpty
+          ? Icon(Icons.inventory_2_outlined, size: 18, color: context.primary)
+          : Text(name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
+              style: TextStyle(fontSize: side * .42, fontWeight: FontWeight.w800, color: context.primary)),
+    );
+  }
 }
 
 String methodKey(String m) => switch (m) {
@@ -309,37 +297,33 @@ class MethodIcon extends StatelessWidget {
         height: size,
         child: Image.asset('assets/images/pay_${methodKey(method)}.png',
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => Icon(methodIcon(method),
-                size: size * .8, color: context.primary)),
+            errorBuilder: (_, __, ___) => Icon(methodIcon(method), size: size * .8, color: context.primary)),
       );
 }
 
-Future<T?> showSheet<T>(BuildContext c, String title, Widget body) =>
-    showModalBottomSheet<T>(
+Future<T?> showSheet<T>(BuildContext c, String title, Widget body) => showModalBottomSheet<T>(
       context: c,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      constraints: const BoxConstraints(maxWidth: 560),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 12, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
         child: SingleChildScrollView(
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Expanded(
-                      child: Text(title,
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w700))),
-                  IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.pop(ctx)),
-                ]),
-                body,
-              ]),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
+            Row(children: [
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -.3))),
+              IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+            ]),
+            body,
+          ]),
         ),
       ),
     );

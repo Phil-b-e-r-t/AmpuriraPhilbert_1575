@@ -4,40 +4,46 @@ import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-// ───────────────────────── Overlay / Notifications ─────────────────────────
+// ─────────────────────── Alerts (live: low stock, out of stock, ending promotions, offline) ───────────────────────
 void showNotifications(BuildContext context) {
-  Widget row(IconData i, String t, String sub, String when) => Padding(
+  final s = context.read<AppState>();
+  final items = s.alerts;
+  Widget row(AppAlert a) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
-          CircleAvatar(backgroundColor: context.primary.withValues(alpha: .1), child: Icon(i, size: 18, color: context.primary)),
+          CircleAvatar(
+              backgroundColor: (a.critical ? C.red : context.primary).withValues(alpha: .1),
+              child: Icon(a.icon, size: 18, color: a.critical ? C.red : context.primary)),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            Text(sub, style: const TextStyle(fontSize: 12, color: C.grey)),
+          Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(a.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(a.sub, style: const TextStyle(fontSize: 12, color: C.grey)),
           ])),
-          Text(when, style: const TextStyle(fontSize: 11, color: C.grey)),
         ]),
       );
-  // These are sample items. Hook them to real events (low stock, payments, sync) later.
   showSheet(
       context,
-      'Notifications',
-      Column(children: [
-        row(Icons.inventory_2_outlined, 'Low stock: Sprite 500ml', 'Only 12 units left', '2m ago'),
-        const Divider(height: 1, color: C.border),
-        row(Icons.credit_card, 'Payment received', 'UGX 120,000 via Card', '15m ago'),
-        const Divider(height: 1, color: C.border),
-        row(Icons.check, 'Local data saved', 'Sales are stored on this device', '1h ago'),
-        const SizedBox(height: 14),
-        Builder(
-            builder: (ctx) => PrimaryButton('Mark all as read', outlined: true, onTap: () {
-                  context.read<AppState>().markAllRead();
-                  Navigator.pop(ctx);
-                })),
-      ]));
+      'Alerts',
+      items.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 30),
+              child: Center(child: Text('All clear — nothing needs your attention.', style: TextStyle(color: C.grey))))
+          : Column(children: [
+              for (var i = 0; i < items.length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: C.border),
+                row(items[i]),
+              ],
+              const SizedBox(height: 14),
+              Builder(
+                  builder: (ctx) => PrimaryButton('Mark all as read', outlined: true, onTap: () {
+                        context.read<AppState>().markAllRead();
+                        Navigator.pop(ctx);
+                      })),
+            ]));
 }
 
-// ───────────────────────── 11. Offline Mode ─────────────────────────
+// ─────────────────────── 11. Offline Mode ───────────────────────
 class OfflinePage extends StatelessWidget {
   const OfflinePage({super.key});
 

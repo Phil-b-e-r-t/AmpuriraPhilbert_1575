@@ -15,11 +15,11 @@ class Db {
   // ───────── demo data (shared by both back-ends) ─────────
   static Map<String, List<Map<String, Object?>>> _seedData() {
     final products = [
-      Product(id: 'p1', name: 'Coca Cola 500ml', price: 2500, stock: 50, reorder: 20, category: 'Drinks', image: 'assets/images/coke.png'),
-      Product(id: 'p2', name: 'Sprite 500ml', price: 2500, stock: 40, reorder: 20, category: 'Drinks', image: 'assets/images/sprite.png'),
-      Product(id: 'p3', name: 'Water 500ml', price: 1500, stock: 100, reorder: 30, category: 'Drinks', image: 'assets/images/water.png'),
-      Product(id: 'p4', name: 'Bread', price: 3000, stock: 30, reorder: 10, category: 'Food', image: 'assets/images/bread.png'),
-      Product(id: 'p5', name: 'Chips', price: 2000, stock: 45, reorder: 15, category: 'Snacks', image: 'assets/images/chips.png'),
+      Product(id: 'p1', name: 'Coca Cola 500ml', price: 2500, stock: 50, reorder: 20, category: 'Drinks', image: 'assets/images/coke.png', barcode: '6001000000011'),
+      Product(id: 'p2', name: 'Sprite 500ml', price: 2500, stock: 40, reorder: 20, category: 'Drinks', image: 'assets/images/sprite.png', barcode: '6001000000028'),
+      Product(id: 'p3', name: 'Water 500ml', price: 1500, stock: 100, reorder: 30, category: 'Drinks', image: 'assets/images/water.png', barcode: '6001000000035'),
+      Product(id: 'p4', name: 'Bread', price: 3000, stock: 30, reorder: 10, category: 'Food', image: 'assets/images/bread.png', barcode: '6001000000042'),
+      Product(id: 'p5', name: 'Chips', price: 2000, stock: 45, reorder: 15, category: 'Snacks', image: 'assets/images/chips.png', barcode: '6001000000059'),
     ];
     final customers = [
       Customer(id: 'c1', name: 'John Mwangi', phone: '+256 700 123 456'),
@@ -57,23 +57,35 @@ class Db {
   // ───────── native (SQLite) ─────────
   static Future<Database> _open() async {
     final path = p.join(await getDatabasesPath(), 'pos_retail_pro.db');
-    return openDatabase(path, version: 1, onCreate: (db, v) async {
-      await db.execute(
-          'CREATE TABLE products(id TEXT PRIMARY KEY, name TEXT, price INTEGER, stock INTEGER, reorder INTEGER, category TEXT, image TEXT)');
-      await db.execute(
-          'CREATE TABLE customers(id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT)');
-      await db.execute(
-          'CREATE TABLE sales(id TEXT PRIMARY KEY, receipt TEXT, total INTEGER, tax INTEGER, method TEXT, customer TEXT, created INTEGER, synced INTEGER, items TEXT, paypal_ref TEXT)');
-      if (seedDemoData) {
-        final b = db.batch();
-        _seedData().forEach((table, rows) {
-          for (final r in rows) {
-            b.insert(table, r);
-          }
-        });
-        await b.commit(noResult: true);
-      }
-    });
+    return openDatabase(
+      path,
+      version: 2,
+      onCreate: (db, v) async {
+        await db.execute(
+            "CREATE TABLE products(id TEXT PRIMARY KEY, name TEXT, price INTEGER, stock INTEGER, reorder INTEGER, category TEXT, image TEXT, barcode TEXT DEFAULT '')");
+        await db.execute(
+            'CREATE TABLE customers(id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT)');
+        await db.execute(
+            "CREATE TABLE sales(id TEXT PRIMARY KEY, receipt TEXT, total INTEGER, tax INTEGER, method TEXT, customer TEXT, created INTEGER, synced INTEGER, items TEXT, paypal_ref TEXT, discount INTEGER DEFAULT 0, cashier TEXT DEFAULT '')");
+        if (seedDemoData) {
+          final b = db.batch();
+          _seedData().forEach((table, rows) {
+            for (final r in rows) {
+              b.insert(table, r);
+            }
+          });
+          await b.commit(noResult: true);
+        }
+      },
+      // v1 → v2: barcode on products, discount + cashier on sales. Existing data is kept.
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute("ALTER TABLE products ADD COLUMN barcode TEXT DEFAULT ''");
+          await db.execute('ALTER TABLE sales ADD COLUMN discount INTEGER DEFAULT 0');
+          await db.execute("ALTER TABLE sales ADD COLUMN cashier TEXT DEFAULT ''");
+        }
+      },
+    );
   }
 
   // ───────── web (browser storage) ─────────
@@ -137,6 +149,16 @@ class Db {
   static Future<void> saveProduct(Product x) async => kIsWeb
       ? _wUpsert('products', x.toMap())
       : (await d).insert('products', x.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+
+  static Future<void> deleteProduct(String id) async {
+    if (kIsWeb) {
+      final rows = await _wl('products');
+      rows.removeWhere((r) => r['id'] == id);
+      await _ws('products', rows);
+      return;
+    }
+    await (await d).delete('products', where: 'id = ?', whereArgs: [id]);
+  }
 
   static Future<void> saveCustomer(Customer x) async => kIsWeb
       ? _wUpsert('customers', x.toMap())
