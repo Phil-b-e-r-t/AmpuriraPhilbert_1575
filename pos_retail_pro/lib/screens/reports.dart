@@ -9,7 +9,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'receipt.dart';
 
-// ─────────────────────── 9. Reports & Analytics (owner only, reads live data) ───────────────────────
+// ─────────────────────── Reports & Analytics (owner only, reads live data) ───────────────────────
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
   @override
@@ -25,7 +25,7 @@ class _ReportsPageState extends State<ReportsPage> {
     if (!s.isOwner) {
       return Scaffold(
           appBar: appBar(context, 'Reports'),
-          body: const Center(child: Text('Reports are available to owners only.', style: TextStyle(color: C.grey))));
+          body: const EmptyState(Icons.lock_outline, 'Owners only', 'Reports are available to owners.'));
     }
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -42,52 +42,50 @@ class _ReportsPageState extends State<ReportsPage> {
 
     return Scaffold(
       appBar: appBar(context, 'Reports'),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        SegTabs(const ['Sales', 'Products', 'Payments', 'History'], type, (i) => setState(() => type = i)),
-        const SizedBox(height: 12),
-        SegTabs(const ['Today', 'Week', 'Month'], range, (i) => setState(() => range = i)),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: C.border)),
-          child: Column(children: [
-            Row(children: [
-              Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Total Sales', style: TextStyle(fontSize: 12, color: C.grey)),
-                const SizedBox(height: 6),
-                Text(ugx(total), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: C.navy)),
-                const SizedBox(height: 6),
-                Text('${pct >= 0 ? '↑' : '↓'} ${pct.abs()}%  •  ${list.length} transactions',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: pct >= 0 ? C.green : C.red)),
-              ])),
-              for (final h in [16.0, 26.0, 36.0])
-                Container(width: 6, height: h, margin: const EdgeInsets.only(left: 4), decoration: BoxDecoration(color: context.primary, borderRadius: BorderRadius.circular(3))),
+      body: Centered(
+        maxWidth: 900,
+        child: ListView(padding: const EdgeInsets.all(16), children: [
+          SegTabs(const ['Sales', 'Products', 'Payments', 'History'], type, (i) => setState(() => type = i)),
+          const SizedBox(height: 10),
+          SegTabs(const ['Today', 'Week', 'Month'], range, (i) => setState(() => range = i)),
+          const SizedBox(height: 16),
+          AppCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(children: [
+              Row(children: [
+                Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Total sales', style: TextStyle(fontSize: 12.5, color: C.grey)),
+                  const SizedBox(height: 6),
+                  Text(ugx(total), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -.8)),
+                ])),
+                Pill('${pct >= 0 ? '↑' : '↓'} ${pct.abs()}%', pct >= 0 ? C.green : C.red),
+              ]),
+              const Divider(height: 26, color: C.border),
+              Row(children: [
+                _Stat('Transactions', '${list.length}'),
+                _Stat('Avg. sale', ugx(avg)),
+                _Stat('Discounts', ugx(discounts)),
+                _Stat('Tax', ugx(taxes)),
+              ]),
             ]),
-            const Divider(height: 24, color: C.border),
-            Row(children: [
-              _Stat('Avg. sale', ugx(avg)),
-              _Stat('Discounts', ugx(discounts)),
-              _Stat('Tax collected', ugx(taxes)),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: 22),
-        if (type == 0) ...[
-          const Text('Sales Trend', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 14),
-          SizedBox(height: 190, child: _Trend(days: range == 2 ? 30 : 7)),
+          ),
           const SizedBox(height: 18),
-          Row(children: [
-            Expanded(child: _MiniCard(Icons.trending_up, 'Top Products', () => setState(() => type = 1))),
-            const SizedBox(width: 10),
-            Expanded(child: _MiniCard(Icons.account_balance_wallet_outlined, 'Payment Methods', () => setState(() => type = 2))),
-          ]),
-        ],
-        if (type == 1) ..._topProducts(list, s),
-        if (type == 2) ..._byMethod(list, total),
-        if (type == 3) ..._history(context, list, s),
-      ]),
+          if (type == 0) ...[
+            const SectionTitle('Sales trend'),
+            AppCard(padding: const EdgeInsets.fromLTRB(8, 18, 16, 10), child: SizedBox(height: 200, child: _Trend(days: range == 2 ? 30 : 7))),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(child: _MiniCard(Icons.trending_up, 'Top products', () => setState(() => type = 1))),
+              const SizedBox(width: 10),
+              Expanded(child: _MiniCard(Icons.account_balance_wallet_outlined, 'Payment methods', () => setState(() => type = 2))),
+            ]),
+          ],
+          if (type == 1) ..._topProducts(list, s),
+          if (type == 2) AppCard(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Column(children: _byMethod(list, total))),
+          if (type == 3) ..._history(context, list, s),
+        ]),
+      ),
     );
   }
 
@@ -102,27 +100,41 @@ class _ReportsPageState extends State<ReportsPage> {
     final names = qty.keys.toList()..sort((a, b) => rev[b]!.compareTo(rev[a]!));
     final reorder = s.products.where((p) => p.low).toList()..sort((a, b) => a.stock.compareTo(b.stock));
     return [
-      if (names.isEmpty)
-        const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No product sales in this period yet.', style: TextStyle(color: C.grey)))),
-      for (final n in names)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(n, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          subtitle: Text('${qty[n]} sold'),
-          trailing: Text(ugx(rev[n]!), style: const TextStyle(fontWeight: FontWeight.w600)),
-        ),
+      const SectionTitle('Top products'),
+      AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: names.isEmpty
+            ? const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No product sales in this period yet.', style: TextStyle(color: C.grey, fontSize: 12.5))))
+            : Column(children: [
+                for (var i = 0; i < names.length; i++) ...[
+                  if (i > 0) const Divider(height: 1, color: C.border),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(radius: 15, backgroundColor: context.primary.withValues(alpha: .10), child: Text('${i + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: context.primary))),
+                    title: Text(names[i], style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                    subtitle: Text('${qty[names[i]]} sold', style: const TextStyle(fontSize: 11.5)),
+                    trailing: Text(ugx(rev[names[i]]!), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  ),
+                ],
+              ]),
+      ),
       if (reorder.isNotEmpty) ...[
-        const SizedBox(height: 18),
-        const Text('Stock to reorder', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
-        for (final p in reorder)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            subtitle: Text('Reorder level ${p.reorder}'),
-            trailing: Text(p.stock == 0 ? 'Out of stock' : '${p.stock} left',
-                style: TextStyle(fontWeight: FontWeight.w600, color: p.stock == 0 ? C.red : C.amber)),
-          ),
+        const SizedBox(height: 20),
+        const SectionTitle('Stock to reorder'),
+        AppCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Column(children: [
+            for (var i = 0; i < reorder.length; i++) ...[
+              if (i > 0) const Divider(height: 1, color: C.border),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(reorder[i].name, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                subtitle: Text('Reorder level ${reorder[i].reorder}', style: const TextStyle(fontSize: 11.5)),
+                trailing: reorder[i].stock == 0 ? const Pill('Out of stock', C.red) : Pill('${reorder[i].stock} left', C.amber),
+              ),
+            ],
+          ]),
+        ),
       ],
     ];
   }
@@ -133,19 +145,19 @@ class _ReportsPageState extends State<ReportsPage> {
       m[x.method] = (m[x.method] ?? 0) + x.total;
     }
     final keys = m.keys.toList()..sort((a, b) => m[b]!.compareTo(m[a]!));
-    if (keys.isEmpty) return [const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No payments in this period yet.', style: TextStyle(color: C.grey))))];
+    if (keys.isEmpty) return [const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No payments in this period yet.', style: TextStyle(color: C.grey, fontSize: 12.5))))];
     return [
       for (final k in keys)
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           child: Column(children: [
             Row(children: [
               MethodIcon(k, size: 22),
               const SizedBox(width: 10),
-              Expanded(child: Text(k, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-              Text(ugx(m[k]!), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Expanded(child: Text(k, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
+              Text(ugx(m[k]!), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: total == 0 ? 0 : m[k]! / total, minHeight: 6, backgroundColor: C.border)),
           ]),
         )
@@ -154,34 +166,43 @@ class _ReportsPageState extends State<ReportsPage> {
 
   /// Every sale in the period; tap one to open its receipt.
   List<Widget> _history(BuildContext context, List<Sale> list, AppState s) {
-    if (list.isEmpty) {
-      return [const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No sales in this period yet.', style: TextStyle(color: C.grey))))];
-    }
     return [
-      PrimaryButton('Copy sales as CSV', icon: Icons.table_chart_outlined, outlined: true, onTap: () async {
-        await Clipboard.setData(ClipboardData(text: _csv(list)));
-        if (context.mounted) context.snack('Copied ${list.length} sales — paste into Excel or Sheets');
-      }),
-      const SizedBox(height: 8),
-      for (final x in list.take(100)) ...[
-        InkWell(
-          onTap: () => showReceipt(context, x, s.businessName),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(children: [
-              MethodIcon(x.method, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(x.receipt, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                Text('${x.customer} · ${DateFormat('MMM d, hh:mm a').format(x.created)}', style: const TextStyle(fontSize: 11, color: C.grey)),
-              ])),
-              Text(ugx(x.total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            ]),
-          ),
-        ),
-        const Divider(height: 1, color: C.border),
-      ],
+      SectionTitle('Transactions',
+          trailing: list.isEmpty
+              ? null
+              : TextButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: _csv(list)));
+                    if (context.mounted) context.snack('Copied ${list.length} sales — paste into Excel or Sheets');
+                  },
+                  icon: const Icon(Icons.table_chart_outlined, size: 16),
+                  label: const Text('Copy CSV'))),
+      AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: list.isEmpty
+            ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No sales in this period yet.', style: TextStyle(color: C.grey, fontSize: 12.5))))
+            : Column(children: [
+                for (var i = 0; i < list.take(100).length; i++) ...[
+                  if (i > 0) const Divider(height: 1, color: C.border, indent: 12, endIndent: 12),
+                  InkWell(
+                    onTap: () => showReceipt(context, list[i], s.businessName),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      child: Row(children: [
+                        MethodIcon(list[i].method, size: 26),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(list[i].receipt, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          Text('${list[i].customer} · ${DateFormat('MMM d, hh:mm a').format(list[i].created)}', style: const TextStyle(fontSize: 11, color: C.grey)),
+                        ])),
+                        Text(ugx(list[i].total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  ),
+                ],
+              ]),
+      ),
     ];
   }
 
@@ -217,9 +238,9 @@ class _Stat extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: C.grey)),
+          Text(label, style: const TextStyle(fontSize: 10.5, color: C.grey)),
           const SizedBox(height: 3),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
         ]),
       );
 }
@@ -230,17 +251,14 @@ class _MiniCard extends StatelessWidget {
   final VoidCallback onTap;
   const _MiniCard(this.icon, this.label, this.onTap);
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => AppCard(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(border: Border.all(color: C.border), borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [
-            Icon(icon, color: context.primary),
-            const SizedBox(width: 10),
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
-          ]),
-        ),
+        child: Row(children: [
+          Icon(icon, color: context.primary),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))),
+          const Icon(Icons.chevron_right, size: 18, color: C.grey),
+        ]),
       );
 }
 
@@ -268,7 +286,7 @@ class _Trend extends StatelessWidget {
         leftTitles: AxisTitles(
             sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 38,
+                reservedSize: 40,
                 interval: maxY / 2,
                 getTitlesWidget: (v, _) => Text(NumberFormat.compact().format(v), style: ts))),
         bottomTitles: AxisTitles(
