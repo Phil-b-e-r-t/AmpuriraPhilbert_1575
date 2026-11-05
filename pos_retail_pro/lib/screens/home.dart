@@ -12,6 +12,7 @@ import 'reports.dart';
 import 'sales.dart';
 import 'scanner.dart';
 import 'settings.dart';
+import 'staff.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -22,54 +23,87 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int idx = 0;
 
+  static const _dest = [
+    (Icons.dashboard_outlined, Icons.dashboard, 'Home'),
+    (Icons.point_of_sale_outlined, Icons.point_of_sale, 'Sales'),
+    (Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory'),
+    (Icons.people_outline, Icons.people, 'Customers'),
+    (Icons.settings_outlined, Icons.settings, 'Settings'),
+  ];
+
+  Widget _banner(bool online) => online
+      ? const SizedBox.shrink()
+      : GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OfflinePage())),
+          child: Container(
+            width: double.infinity,
+            color: C.amber,
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 6, bottom: 6),
+            child: const Text('Offline • sales and updates are saved on this device',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600)),
+          ),
+        );
+
   @override
   Widget build(BuildContext context) {
     final online = context.select<AppState, bool>((s) => s.online);
-    return Scaffold(
-      body: Column(children: [
-        if (!online)
-          GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OfflinePage())),
-            child: Container(
-              width: double.infinity,
-              color: C.amber,
-              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 6, bottom: 6),
-              child: const Text('Offline • sales and updates are saved on this device',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+    final pages = IndexedStack(index: idx, children: [
+      HomePage(onGo: (i) => setState(() => idx = i)),
+      const ProductSelectionPage(tab: true),
+      const InventoryPage(tab: true),
+      const CustomersPage(tab: true),
+      const SettingsPage(tab: true),
+    ]);
+    final body = Column(children: [
+      _banner(online),
+      Expanded(child: MediaQuery.removePadding(context: context, removeTop: !online, child: pages)),
+    ]);
+
+    if (context.wide) {
+      return Scaffold(
+        body: Row(children: [
+          NavigationRail(
+            selectedIndex: idx,
+            onDestinationSelected: (i) => setState(() => idx = i),
+            labelType: NavigationRailLabelType.all,
+            backgroundColor: Colors.white,
+            indicatorColor: context.primary.withValues(alpha: .12),
+            selectedLabelTextStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.primary),
+            unselectedLabelTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: C.grey),
+            leading: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: context.primary, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.storefront_rounded, color: Colors.white),
+              ),
             ),
+            destinations: [
+              for (final d in _dest)
+                NavigationRailDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: Text(d.$3)),
+            ],
           ),
-        Expanded(
-          child: MediaQuery.removePadding(
-            context: context,
-            removeTop: !online,
-            child: IndexedStack(index: idx, children: [
-              HomePage(onGo: (i) => setState(() => idx = i)),
-              const ProductSelectionPage(tab: true),
-              const InventoryPage(tab: true),
-              const CustomersPage(tab: true),
-              const SettingsPage(tab: true),
-            ]),
-          ),
-        ),
-      ]),
+          const VerticalDivider(width: 1, color: C.border),
+          Expanded(child: body),
+        ]),
+      );
+    }
+    return Scaffold(
+      body: body,
       bottomNavigationBar: NavigationBar(
-        height: 64,
-        backgroundColor: Colors.white,
         selectedIndex: idx,
         onDestinationSelected: (i) => setState(() => idx = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), selectedIcon: Icon(Icons.shopping_cart), label: 'Sales'),
-          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Inventory'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Customers'),
-          NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
+        destinations: [
+          for (final d in _dest) NavigationDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: d.$3),
         ],
       ),
     );
   }
 }
 
+// ─────────────────────── Dashboard ───────────────────────
 class HomePage extends StatelessWidget {
   final void Function(int) onGo;
   const HomePage({super.key, required this.onGo});
@@ -79,148 +113,202 @@ class HomePage extends StatelessWidget {
     final s = context.watch<AppState>();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final todayTotal = s.totalSince(today);
+    final todays = s.sales.where((x) => !x.created.isBefore(today)).toList();
+    final todayTotal = todays.fold<int>(0, (a, b) => a + b.total);
+    final orders = todays.length;
+    final avg = orders == 0 ? 0 : (todayTotal / orders).round();
     final yesterday = s.totalSince(today.subtract(const Duration(days: 1)), today);
     final pct = yesterday == 0 ? 0 : ((todayTotal - yesterday) / yesterday * 100).round();
     final greet = now.hour < 12 ? 'Good morning' : now.hour < 17 ? 'Good afternoon' : 'Good evening';
-    void openReports() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportsPage()));
+    final week = s.dailyTotals(7);
+    final maxDay = week.fold<double>(0, (a, b) => a > b ? a : b);
+    final lowCount = s.products.where((p) => p.low).length;
+    final attention = s.alerts.where((a) => a.key != 'offline').take(3).toList();
+    final initial = s.userName.isEmpty ? '?' : s.userName[0].toUpperCase();
+    void push(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
 
-    Widget tile(IconData i, String label, VoidCallback onTap) => Expanded(
-          child: GestureDetector(
-            onTap: onTap,
-            child: Container(
-              height: 88,
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: C.border)),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                CircleAvatar(
-                    radius: 20,
-                    backgroundColor: context.primary.withValues(alpha: .1),
-                    child: Icon(i, size: 22, color: context.primary)),
-                const SizedBox(height: 8),
-                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              ]),
+    Widget tile(IconData i, String label, VoidCallback onTap) => AppCard(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          onTap: onTap,
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: context.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(12)),
+              child: Icon(i, size: 22, color: context.primary),
             ),
-          ),
+            const SizedBox(height: 8),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+          ]),
         );
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: ListView(padding: const EdgeInsets.symmetric(horizontal: 20), children: [
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(
-                child: Text('$greet,\n${s.userName}',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, height: 1.3))),
-            Badge(
-              isLabelVisible: s.unread > 0,
-              label: Text('${s.unread}'),
-              child: IconButton(
-                  icon: const Icon(Icons.notifications_none),
-                  tooltip: 'Alerts',
-                  onPressed: () => showNotifications(context)),
-            ),
-            const SizedBox(width: 6),
-            const CircleAvatar(
-                radius: 14,
-                backgroundColor: C.border,
-                child: Icon(Icons.person, size: 16, color: C.grey)),
+    Widget heroStat(String l, String v) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(l, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            const SizedBox(height: 3),
+            Text(v, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
           ]),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: C.navy, borderRadius: BorderRadius.circular(14)),
-            child: Row(children: [
+        );
+
+    final actions = <Widget>[
+      tile(Icons.point_of_sale, 'New Sale', () => onGo(1)),
+      tile(Icons.qr_code_scanner, 'Scan & Sell', () => openSaleScanner(context)),
+      tile(Icons.price_check, 'Price Check', () => openPriceCheck(context)),
+      tile(Icons.inventory_2_outlined, 'Inventory', () => onGo(2)),
+      tile(Icons.people_outline, 'Customers', () => onGo(3)),
+      if (s.isOwner) ...[
+        tile(Icons.bar_chart_rounded, 'Reports', () => push(const ReportsPage())),
+        tile(Icons.local_offer_outlined, 'Promotions', () => push(const PromotionsPage())),
+        tile(Icons.groups_outlined, 'Team', () => push(const StaffPage())),
+      ] else
+        tile(Icons.notifications_none, 'Alerts', () => showNotifications(context)),
+    ];
+
+    return Scaffold(
+      body: SafeArea(
+        child: Centered(
+          maxWidth: 1000,
+          child: ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 28), children: [
+            // ── header ──
+            Row(children: [
               Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text("Today's Sales", style: TextStyle(color: Colors.white70, fontSize: 11)),
-                const SizedBox(height: 6),
-                Text(ugx(todayTotal),
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text('${pct >= 0 ? '↑' : '↓'} ${pct.abs()}%',
-                    style: TextStyle(
-                        color: pct >= 0 ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600)),
+                Text('$greet · ${s.businessName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: C.grey)),
+                const SizedBox(height: 2),
+                Text(s.userName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -.5)),
               ])),
-              for (final h in [16.0, 26.0, 36.0])
-                Container(
-                    width: 6,
-                    height: h,
-                    margin: const EdgeInsets.only(left: 4),
-                    decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .6), borderRadius: BorderRadius.circular(3))),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          Row(children: [
-            tile(Icons.shopping_cart_outlined, 'New Sale', () => onGo(1)),
-            const SizedBox(width: 10),
-            tile(Icons.inventory_2_outlined, 'Inventory', () => onGo(2)),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            tile(Icons.qr_code_scanner, 'Scan & Sell', () => openSaleScanner(context)),
-            const SizedBox(width: 10),
-            tile(Icons.price_check, 'Price Check', () => openPriceCheck(context)),
-          ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            tile(Icons.people_outline, 'Customers', () => onGo(3)),
-            const SizedBox(width: 10),
-            if (s.isOwner)
-              tile(Icons.bar_chart, 'Reports', openReports)
-            else
-              tile(Icons.notifications_none, 'Alerts', () => showNotifications(context)),
-          ]),
-          if (s.isOwner) ...[
-            const SizedBox(height: 10),
-            Row(children: [
-              tile(Icons.local_offer_outlined, 'Promotions',
-                  () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PromotionsPage()))),
+              Badge(
+                isLabelVisible: s.unread > 0,
+                label: Text('${s.unread}'),
+                child: Container(
+                  decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: C.border)),
+                  child: IconButton(icon: const Icon(Icons.notifications_none_rounded), tooltip: 'Alerts', onPressed: () => showNotifications(context)),
+                ),
+              ),
               const SizedBox(width: 10),
-              tile(Icons.notifications_none, 'Alerts', () => showNotifications(context)),
+              CircleAvatar(radius: 21, backgroundColor: context.primary.withValues(alpha: .12), child: Text(initial, style: TextStyle(fontWeight: FontWeight.w800, color: context.primary))),
             ]),
-          ],
-          const SizedBox(height: 22),
-          Row(children: [
-            const Expanded(
-                child: Text('Recent Transactions',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
-            if (s.isOwner)
-              GestureDetector(
-                  onTap: openReports,
-                  child: Text('View All',
-                      style: TextStyle(fontSize: 12, color: context.primary, fontWeight: FontWeight.w600))),
-          ]),
-          const SizedBox(height: 8),
-          for (final x in s.sales.take(3)) ...[
-            InkWell(
-              onTap: () => showReceipt(context, x, s.businessName),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(children: [
-                  MethodIcon(x.method, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(x.method == 'Cash' ? 'Cash Sale' : x.method == 'Card' ? 'Card Payment' : x.method,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(ugx(x.total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text(DateFormat('hh:mm a').format(x.created),
-                        style: const TextStyle(fontSize: 11, color: C.grey)),
+            const SizedBox(height: 18),
+            // ── today hero ──
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [context.primary, Color.lerp(context.primary, Colors.black, .38)!]),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Expanded(child: Text("Today's sales", style: TextStyle(color: Colors.white70, fontSize: 12.5, fontWeight: FontWeight.w500))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: .18), borderRadius: BorderRadius.circular(20)),
+                    child: Text('${pct >= 0 ? '↑' : '↓'} ${pct.abs()}% vs yesterday', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                Text(ugx(todayTotal), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 64,
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    for (var i = 0; i < week.length; i++)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                            Container(
+                              height: 6 + (maxDay <= 0 ? 0 : 38 * (week[i] / maxDay)),
+                              decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: i == week.length - 1 ? .95 : .35),
+                                  borderRadius: BorderRadius.circular(5)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(DateFormat('E').format(today.subtract(Duration(days: week.length - 1 - i))).substring(0, 1),
+                                style: const TextStyle(color: Colors.white70, fontSize: 9.5)),
+                          ]),
+                        ),
+                      ),
                   ]),
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white24, height: 1),
+                const SizedBox(height: 14),
+                Row(children: [heroStat('Orders', '$orders'), heroStat('Avg. sale', ugx(avg)), heroStat('Low stock', '$lowCount')]),
+              ]),
+            ),
+            const SizedBox(height: 22),
+            const SectionTitle('Quick actions'),
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: .92,
+              children: actions,
+            ),
+            if (attention.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              SectionTitle('Needs attention',
+                  trailing: TextButton(onPressed: () => showNotifications(context), child: const Text('View all'))),
+              AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: Column(children: [
+                  for (var i = 0; i < attention.length; i++) ...[
+                    if (i > 0) const Divider(height: 1, color: C.border),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      child: Row(children: [
+                        CircleAvatar(
+                            radius: 17,
+                            backgroundColor: (attention[i].critical ? C.red : C.amber).withValues(alpha: .12),
+                            child: Icon(attention[i].icon, size: 17, color: attention[i].critical ? C.red : C.amber)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(attention[i].title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text(attention[i].sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: C.grey)),
+                        ])),
+                      ]),
+                    ),
+                  ],
                 ]),
               ),
+            ],
+            const SizedBox(height: 22),
+            SectionTitle('Recent transactions',
+                trailing: s.isOwner ? TextButton(onPressed: () => push(const ReportsPage()), child: const Text('View all')) : null),
+            AppCard(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: s.sales.isEmpty
+                  ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No sales yet. Your first sale will appear here.', style: TextStyle(color: C.grey, fontSize: 12.5))))
+                  : Column(children: [
+                      for (var i = 0; i < s.sales.take(5).length; i++) ...[
+                        if (i > 0) const Divider(height: 1, color: C.border, indent: 12, endIndent: 12),
+                        InkWell(
+                          onTap: () => showReceipt(context, s.sales[i], s.businessName),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            child: Row(children: [
+                              MethodIcon(s.sales[i].method, size: 28),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(s.sales[i].customer, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                Text('${s.sales[i].method} · ${DateFormat('MMM d, hh:mm a').format(s.sales[i].created)}', style: const TextStyle(fontSize: 11, color: C.grey)),
+                              ])),
+                              Text(ugx(s.sales[i].total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                            ]),
+                          ),
+                        ),
+                      ],
+                    ]),
             ),
-            const Divider(height: 1, color: C.border),
-          ],
-          const SizedBox(height: 16),
-        ]),
+          ]),
+        ),
       ),
     );
   }
