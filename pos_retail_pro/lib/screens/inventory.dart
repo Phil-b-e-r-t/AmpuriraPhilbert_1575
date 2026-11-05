@@ -6,7 +6,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'scanner.dart';
 
-// ─────────────────────── 7. Inventory Management ───────────────────────
+// ─────────────────────── Inventory ───────────────────────
 class InventoryPage extends StatefulWidget {
   final bool tab;
   const InventoryPage({super.key, this.tab = false});
@@ -40,6 +40,9 @@ class _InventoryPageState extends State<InventoryPage> {
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     final query = q.trim().toLowerCase();
+    final lowCount = s.products.where((p) => p.low && p.stock > 0).length;
+    final outCount = s.products.where((p) => p.stock <= 0).length;
+    final value = s.products.fold<int>(0, (a, p) => a + p.price * p.stock);
     final list = s.products.where((p) {
       final okTab = tabIdx == 0 || (tabIdx == 1 && p.low && p.stock > 0) || (tabIdx == 2 && p.stock == 0);
       return okTab && (p.name.toLowerCase().contains(query) || p.barcode.toLowerCase().contains(query));
@@ -51,51 +54,87 @@ class _InventoryPageState extends State<InventoryPage> {
       ]),
       floatingActionButton: !s.isOwner
           ? null
-          : FloatingActionButton(
+          : FloatingActionButton.extended(
               backgroundColor: context.primary,
               foregroundColor: Colors.white,
+              elevation: 2,
               onPressed: () => showSheet(context, 'Add Item', const _ProductForm()),
-              child: const Icon(Icons.add),
+              icon: const Icon(Icons.add),
+              label: const Text('Add item', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
-      body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 10), child: SegTabs(const ['All', 'Low Stock', 'Out of Stock'], tabIdx, (i) => setState(() => tabIdx = i))),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: AppField('Search name or barcode...', icon: Icons.search, onChanged: (v) => setState(() => q = v))),
-        Expanded(
-          child: list.isEmpty
-              ? const Center(child: Text('No items found', style: TextStyle(color: C.grey)))
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: C.border),
-                  itemBuilder: (_, i) {
-                    final p = list[i];
-                    return InkWell(
-                      onTap: () => _open(p, s.isOwner),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+      body: Centered(
+        maxWidth: 900,
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(children: [
+              Expanded(child: AppField('Search name or barcode', icon: Icons.search, onChanged: (v) => setState(() => q = v))),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: SegTabs(['All (${s.products.length})', 'Low ($lowCount)', 'Out ($outCount)'], tabIdx, (i) => setState(() => tabIdx = i)),
+          ),
+          if (s.isOwner)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(children: [
+                  Icon(Icons.account_balance_wallet_outlined, size: 18, color: context.primary),
+                  const SizedBox(width: 10),
+                  const Text('Stock value (at selling price)', style: TextStyle(fontSize: 12, color: C.grey)),
+                  const Spacer(),
+                  Text(ugx(value), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            ),
+          Expanded(
+            child: list.isEmpty
+                ? const EmptyState(Icons.inventory_2_outlined, 'No items found', 'Add products, or change the search and filter.')
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final p = list[i];
+                      final out = p.stock <= 0;
+                      return AppCard(
+                        onTap: () => _open(p, s.isOwner),
+                        padding: const EdgeInsets.all(12),
                         child: Row(children: [
-                          ProductImage(p.image, w: 28, h: 48),
-                          const SizedBox(width: 18),
+                          ProductImage(p.image, name: p.name, w: 48, h: 48),
+                          const SizedBox(width: 14),
                           Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 6),
-                            Text('Stock: ${p.stock}    Reorder: ${p.reorder}', style: TextStyle(fontSize: 11, color: p.low ? C.red : C.grey)),
+                            Wrap(spacing: 6, runSpacing: 4, children: [
+                              Pill(p.category, C.grey),
+                              if (out) const Pill('Out of stock', C.red) else if (p.low) Pill('Low · ${p.stock} left', C.amber) else Pill('${p.stock} in stock', C.green),
+                            ]),
                             if (p.barcode.isNotEmpty)
                               Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(p.barcode, style: const TextStyle(fontSize: 10, color: C.grey))),
+                                  padding: const EdgeInsets.only(top: 5),
+                                  child: Row(children: [
+                                    const Icon(Icons.qr_code_2, size: 12, color: C.grey),
+                                    const SizedBox(width: 4),
+                                    Text(p.barcode, style: const TextStyle(fontSize: 10.5, color: C.grey)),
+                                  ])),
                           ])),
-                          Text(ugx(s.unitPrice(p)), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right, color: C.grey),
+                          const SizedBox(width: 8),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                            Text(ugx(s.unitPrice(p)), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                            if (s.unitDiscount(p) > 0)
+                              Text(ugx(p.price), style: const TextStyle(fontSize: 10.5, color: C.grey, decoration: TextDecoration.lineThrough)),
+                          ]),
                         ]),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ]),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
     );
   }
 }
@@ -108,8 +147,8 @@ class _ProductInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     Widget row(String l, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(children: [Text(l, style: const TextStyle(fontSize: 12, color: C.grey)), const Spacer(), Text(v, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))]));
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(children: [Text(l, style: const TextStyle(fontSize: 12.5, color: C.grey)), const Spacer(), Text(v, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))]));
     return Column(children: [
       row('Price', ugx(s.unitPrice(p))),
       if (s.unitDiscount(p) > 0) row('Regular price', ugx(p.price)),
@@ -233,22 +272,27 @@ class _ProductFormState extends State<_ProductForm> {
       const FieldLabel('Category'),
       DropdownButtonFormField<String>(
         initialValue: cat,
-        decoration: InputDecoration(isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+        decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: C.border))),
         items: cats.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: (v) => setState(() => cat = v ?? cat),
       ),
       if (err != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err!, style: const TextStyle(color: C.red, fontSize: 12))),
       const SizedBox(height: 20),
-      PrimaryButton(editing ? 'Save Changes' : 'Save Item', loading: busy, onTap: busy ? null : _save),
+      PrimaryButton(editing ? 'Save changes' : 'Save item', loading: busy, onTap: busy ? null : _save),
       if (editing) ...[
         const SizedBox(height: 10),
-        PrimaryButton('Delete Item', outlined: true, color: C.red, onTap: busy ? null : _delete),
+        PrimaryButton('Delete item', outlined: true, color: C.red, onTap: busy ? null : _delete),
       ],
     ]);
   }
 }
 
-// ─────────────────────── 8. Customer Management ───────────────────────
+// ─────────────────────── Customers ───────────────────────
 class CustomersPage extends StatefulWidget {
   final bool tab;
   const CustomersPage({super.key, this.tab = false});
@@ -264,34 +308,52 @@ class _CustomersPageState extends State<CustomersPage> {
     final list = s.customers.where((c) => c.name.toLowerCase().contains(q.toLowerCase()) || c.phone.contains(q)).toList();
     return Scaffold(
       appBar: appBar(context, 'Customers', back: !widget.tab),
-      body: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 6), child: AppField('Search customers...', icon: Icons.search, onChanged: (v) => setState(() => q = v))),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: C.border),
-            itemBuilder: (_, i) {
-              final c = list[i];
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(backgroundColor: context.primary.withValues(alpha: .1), child: Icon(Icons.person, color: context.primary)),
-                title: Text(c.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                subtitle: Text(c.phone, style: const TextStyle(fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right, color: C.grey),
-                onTap: () {
-                  s.setCustomer(c);
-                  context.snack('${c.name} selected for the next sale');
-                },
-              );
-            },
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: context.primary,
+        foregroundColor: Colors.white,
+        onPressed: () => showSheet(context, 'Add Customer', const _AddCustomerForm()),
+        icon: const Icon(Icons.person_add_alt_1),
+        label: const Text('Add customer', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      body: Centered(
+        maxWidth: 900,
+        child: Column(children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 6), child: AppField('Search customers', icon: Icons.search, onChanged: (v) => setState(() => q = v))),
+          Expanded(
+            child: list.isEmpty
+                ? const EmptyState(Icons.people_outline, 'No customers yet', 'Add customers to attach them to sales.')
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final c = list[i];
+                      return AppCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        onTap: () {
+                          s.setCustomer(c);
+                          context.snack('${c.name} selected for the next sale');
+                        },
+                        child: Row(children: [
+                          CircleAvatar(
+                              radius: 20,
+                              backgroundColor: context.primary.withValues(alpha: .10),
+                              child: Text(c.name.isEmpty ? '?' : c.name[0].toUpperCase(), style: TextStyle(color: context.primary, fontWeight: FontWeight.w800))),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(c.name, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(c.phone, style: const TextStyle(fontSize: 12, color: C.grey)),
+                          ])),
+                          if (s.customer?.id == c.id) const Pill('Selected', C.green) else const Icon(Icons.chevron_right, color: C.grey),
+                        ]),
+                      );
+                    },
+                  ),
           ),
-        ),
-        SafeArea(
-            child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-                child: PrimaryButton('+ Add Customer', onTap: () => showSheet(context, 'Add Customer', const _AddCustomerForm())))),
-      ]),
+        ]),
+      ),
     );
   }
 }
@@ -345,6 +407,6 @@ class _AddCustomerFormState extends State<_AddCustomerForm> {
         AppField('name@email.com', controller: e, type: TextInputType.emailAddress),
         if (err != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err!, style: const TextStyle(color: C.red, fontSize: 12))),
         const SizedBox(height: 20),
-        PrimaryButton('Save Customer', loading: busy, onTap: busy ? null : _save),
+        PrimaryButton('Save customer', loading: busy, onTap: busy ? null : _save),
       ]);
 }
