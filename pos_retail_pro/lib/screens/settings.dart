@@ -26,6 +26,7 @@ class _SettingsPageState extends State<SettingsPage> {
           leading: Container(
             width: 38,
             height: 38,
+            alignment: Alignment.center,
             decoration: BoxDecoration(color: context.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)),
             child: IconTheme(data: IconThemeData(size: 20, color: context.primary), child: i),
           ),
@@ -151,7 +152,16 @@ class _SetPasswordFormState extends State<_SetPasswordForm> {
       Text('You signed in with Google. Choose a password to also sign in with $email.',
           style: const TextStyle(fontSize: 12.5, color: C.grey, height: 1.45)),
       const FieldLabel('Email'),
-      AppField(email, icon: Icons.mail_outline, controller: TextEditingController(text: email), enabled: false),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: C.border)),
+        child: Row(children: [
+          const Icon(Icons.mail_outline, size: 20, color: C.grey),
+          const SizedBox(width: 10),
+          Expanded(child: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: C.grey))),
+        ]),
+      ),
       const FieldLabel('New password'),
       AppField('At least 8 characters',
           icon: Icons.lock_outline,

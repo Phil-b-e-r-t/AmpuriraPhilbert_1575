@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../app_icons.dart';
 import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -24,11 +25,11 @@ class _HomeShellState extends State<HomeShell> {
   int idx = 0;
 
   static const _dest = [
-    (Icons.dashboard_outlined, Icons.dashboard, 'Home'),
-    (Icons.point_of_sale_outlined, Icons.point_of_sale, 'Sales'),
-    (Icons.inventory_2_outlined, Icons.inventory_2, 'Inventory'),
-    (Icons.people_outline, Icons.people, 'Customers'),
-    (Icons.settings_outlined, Icons.settings, 'Settings'),
+    (AppIcon(AppIcons.home), AppIcon(AppIcons.home), 'Home'),
+    (AppIcon(AppIcons.cart), AppIcon(AppIcons.cart), 'Sales'),
+    (AppIcon(AppIcons.inventory), AppIcon(AppIcons.inventory), 'Inventory'),
+    (AppIcon(AppIcons.customers), AppIcon(AppIcons.customers), 'Customers'),
+    (AppIcon(AppIcons.settings), AppIcon(AppIcons.settings), 'Settings'),
   ];
 
   Widget _banner(bool online) => online
@@ -81,8 +82,7 @@ class _HomeShellState extends State<HomeShell> {
               ),
             ),
             destinations: [
-              for (final d in _dest)
-                NavigationRailDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: Text(d.$3)),
+              for (final d in _dest) NavigationRailDestination(icon: d.$1, selectedIcon: d.$2, label: Text(d.$3)),
             ],
           ),
           const VerticalDivider(width: 1, color: C.border),
@@ -96,7 +96,7 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: idx,
         onDestinationSelected: (i) => setState(() => idx = i),
         destinations: [
-          for (final d in _dest) NavigationDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: d.$3),
+          for (final d in _dest) NavigationDestination(icon: d.$1, selectedIcon: d.$2, label: d.$3),
         ],
       ),
     );
@@ -127,15 +127,16 @@ class HomePage extends StatelessWidget {
     final initial = s.userName.isEmpty ? '?' : s.userName[0].toUpperCase();
     void push(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
 
-    Widget tile(IconData i, String label, VoidCallback onTap) => AppCard(
+    Widget tile(String icon, String label, VoidCallback onTap) => AppCard(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           onTap: onTap,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
               width: 42,
               height: 42,
+              alignment: Alignment.center,
               decoration: BoxDecoration(color: context.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(12)),
-              child: Icon(i, size: 22, color: context.primary),
+              child: AppIcon(icon, size: 22, color: context.primary),
             ),
             const SizedBox(height: 8),
             Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
@@ -151,17 +152,17 @@ class HomePage extends StatelessWidget {
         );
 
     final actions = <Widget>[
-      tile(Icons.point_of_sale, 'New Sale', () => onGo(1)),
-      tile(Icons.qr_code_scanner, 'Scan & Sell', () => openSaleScanner(context)),
-      tile(Icons.price_check, 'Price Check', () => openPriceCheck(context)),
-      tile(Icons.inventory_2_outlined, 'Inventory', () => onGo(2)),
-      tile(Icons.people_outline, 'Customers', () => onGo(3)),
+      tile(AppIcons.cart, 'New Sale', () => onGo(1)),
+      tile(AppIcons.scanQr, 'Scan & Sell', () => openSaleScanner(context)),
+      tile(AppIcons.priceCheck, 'Price Check', () => openPriceCheck(context)),
+      tile(AppIcons.inventory, 'Inventory', () => onGo(2)),
+      tile(AppIcons.customers, 'Customers', () => onGo(3)),
       if (s.isOwner) ...[
-        tile(Icons.bar_chart_rounded, 'Reports', () => push(const ReportsPage())),
-        tile(Icons.local_offer_outlined, 'Promotions', () => push(const PromotionsPage())),
-        tile(Icons.groups_outlined, 'Team', () => push(const StaffPage())),
+        tile(AppIcons.reports, 'Reports', () => push(const ReportsPage())),
+        tile(AppIcons.promotions, 'Promotions', () => push(const PromotionsPage())),
+        tile(AppIcons.team, 'Team', () => push(const StaffPage())),
       ] else
-        tile(Icons.notifications_none, 'Alerts', () => showNotifications(context)),
+        tile(AppIcons.alerts, 'Alerts', () => showNotifications(context)),
     ];
 
     return Scaffold(
@@ -182,7 +183,7 @@ class HomePage extends StatelessWidget {
                 label: Text('${s.unread}'),
                 child: Container(
                   decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: C.border)),
-                  child: IconButton(icon: const Icon(Icons.notifications_none_rounded), tooltip: 'Alerts', onPressed: () => showNotifications(context)),
+                  child: IconButton(icon: const AppIcon(AppIcons.bell, size: 22, color: C.text), tooltip: 'Alerts', onPressed: () => showNotifications(context)),
                 ),
               ),
               const SizedBox(width: 10),
