@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../app_icons.dart';
+import '../auth_link.dart';
 import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -7,20 +9,25 @@ import 'promotions.dart';
 import 'staff.dart';
 
 // ─────────────────────── Settings ───────────────────────
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final bool tab;
   const SettingsPage({super.key, this.tab = false});
 
   @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     void go(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
-    Widget item(IconData i, String t, String sub, VoidCallback onTap) => ListTile(
+    Widget item(Widget i, String t, String sub, VoidCallback onTap) => ListTile(
           leading: Container(
             width: 38,
             height: 38,
             decoration: BoxDecoration(color: context.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)),
-            child: Icon(i, size: 20, color: context.primary),
+            child: IconTheme(data: IconThemeData(size: 20, color: context.primary), child: i),
           ),
           title: Text(t, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
           subtitle: Text(sub, style: const TextStyle(fontSize: 11.5, color: C.grey)),
@@ -39,7 +46,7 @@ class SettingsPage extends StatelessWidget {
     final initial = s.userName.isEmpty ? '?' : s.userName[0].toUpperCase();
 
     return Scaffold(
-      appBar: appBar(context, 'Settings', back: !tab),
+      appBar: appBar(context, 'Settings', back: !widget.tab),
       body: Centered(
         maxWidth: 640,
         child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -62,20 +69,30 @@ class SettingsPage extends StatelessWidget {
           if (s.isOwner) ...[
             const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('BUSINESS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.grey, letterSpacing: .8))),
             group([
-              item(Icons.storefront_outlined, 'Business profile', s.businessName, () => go(const BusinessProfilePage())),
-              item(Icons.credit_card, 'Payment methods', '${s.methods.length} enabled', () => go(const PaymentMethodsPage())),
-              item(Icons.local_offer_outlined, 'Promotions & discounts', '${s.promotions.where((p) => p.live).length} active', () => go(const PromotionsPage())),
-              item(Icons.groups_outlined, 'Staff & roles', '${s.staff.length} team members', () => go(const StaffPage())),
+              item(const Icon(Icons.storefront_outlined), 'Business profile', s.businessName, () => go(const BusinessProfilePage())),
+              item(const Icon(Icons.credit_card), 'Payment methods', '${s.methods.length} enabled', () => go(const PaymentMethodsPage())),
+              item(const AppIcon(AppIcons.promotions), 'Promotions & discounts', '${s.promotions.where((p) => p.live).length} active', () => go(const PromotionsPage())),
+              item(const AppIcon(AppIcons.team), 'Staff & roles', '${s.staff.length} team members', () => go(const StaffPage())),
             ]),
             const SizedBox(height: 18),
           ],
           const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('ACCOUNT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.grey, letterSpacing: .8))),
           group([
-            item(Icons.lock_reset, 'Change password', 'Send a reset link to your email', () async {
-              final err = await context.read<AppState>().sendPasswordReset(s.userEmail);
-              if (context.mounted) context.snack(err ?? 'Password reset email sent to ${s.userEmail}');
-            }),
-            item(Icons.info_outline, 'About', 'POS Retail Pro 1.1.0', () => showAboutDialog(context: context, applicationName: 'POS Retail Pro', applicationVersion: '1.1.0')),
+            if (s.hasPasswordLogin)
+              item(const Icon(Icons.lock_reset), 'Change password', 'Send a reset link to your email', () async {
+                final err = await context.read<AppState>().sendPasswordReset(s.userEmail);
+                if (context.mounted) context.snack(err ?? 'Password reset email sent to ${s.userEmail}');
+              })
+            else
+              // Signed in with Google: there is no email password yet, so ask for one.
+              item(const Icon(Icons.lock_outline), 'Set email password', 'Also sign in with ${s.userEmail} and a password', () async {
+                final done = await showSheet<bool>(context, 'Set email password', const _SetPasswordForm());
+                if (done == true && mounted) {
+                  setState(() {});
+                  context.snack('Password set. You can now sign in with your email and password.');
+                }
+              }),
+            item(const Icon(Icons.info_outline), 'About', 'POS Retail Pro 1.1.0', () => showAboutDialog(context: context, applicationName: 'POS Retail Pro', applicationVersion: '1.1.0')),
           ]),
           const SizedBox(height: 22),
           PrimaryButton('Log out', outlined: true, color: C.red, icon: Icons.logout, onTap: () async {
@@ -85,6 +102,70 @@ class SettingsPage extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+/// Asks a Google-signed-in user for the email password to add to their account.
+class _SetPasswordForm extends StatefulWidget {
+  const _SetPasswordForm();
+  @override
+  State<_SetPasswordForm> createState() => _SetPasswordFormState();
+}
+
+class _SetPasswordFormState extends State<_SetPasswordForm> {
+  final _pw = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _hide = true, _busy = false;
+
+  @override
+  void dispose() {
+    _pw.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_pw.text.length < 8) {
+      context.snack('Password must be at least 8 characters');
+      return;
+    }
+    if (_pw.text != _confirm.text) {
+      context.snack('Passwords do not match');
+      return;
+    }
+    setState(() => _busy = true);
+    final err = await context.read<AppState>().setEmailPassword(_pw.text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      context.snack(err);
+      return;
+    }
+    Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final email = context.read<AppState>().userEmail;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('You signed in with Google. Choose a password to also sign in with $email.',
+          style: const TextStyle(fontSize: 12.5, color: C.grey, height: 1.45)),
+      const FieldLabel('Email'),
+      AppField(email, icon: Icons.mail_outline, controller: TextEditingController(text: email), enabled: false),
+      const FieldLabel('New password'),
+      AppField('At least 8 characters',
+          icon: Icons.lock_outline,
+          controller: _pw,
+          obscure: _hide,
+          suffix: IconButton(
+              icon: Icon(_hide ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+              onPressed: () => setState(() => _hide = !_hide))),
+      const FieldLabel('Confirm password'),
+      AppField('Repeat password',
+          icon: Icons.lock_outline, controller: _confirm, obscure: _hide, onSubmitted: (_) => _busy ? null : _save()),
+      const SizedBox(height: 22),
+      PrimaryButton('Save password', loading: _busy, onTap: _busy ? null : _save),
+    ]);
   }
 }
 
