@@ -16,7 +16,7 @@ import 'scanner.dart';
 void _toPayment(BuildContext context) => Navigator.push(
     context, MaterialPageRoute(builder: (_) => const PaymentPage()));
 
-// ─────────────────────── POS: product grid (+ live cart panel on tablets / desktop) ───────────────────────
+// ─────────────────────── POS: product list (+ live cart panel on tablets / desktop) ───────────────────────
 class ProductSelectionPage extends StatefulWidget {
   final bool tab;
   const ProductSelectionPage({super.key, this.tab = false});
@@ -45,13 +45,15 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
 
     final catalog = Column(children: [
       Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
           child: AppField('Search name or barcode',
-              icon: Icons.search, onChanged: (v) => setState(() => q = v))),
+              icon: Icons.search,
+              soft: true,
+              onChanged: (v) => setState(() => q = v))),
       SizedBox(
         height: 38,
         child: ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           scrollDirection: Axis.horizontal,
           itemCount: cats.length,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
@@ -61,11 +63,11 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
               label: Text(cats[i],
                   style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                       color: sel ? Colors.white : C.text)),
               selected: sel,
               selectedColor: context.primary,
-              backgroundColor: Colors.white,
+              backgroundColor: C.bg,
               side: BorderSide(color: sel ? context.primary : C.border),
               showCheckmark: false,
               shape: RoundedRectangleBorder(
@@ -79,27 +81,24 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
         child: list.isEmpty
             ? const EmptyState(Icons.search_off, 'No products found',
                 'Try a different name, barcode or category.')
-            : GridView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 190,
-                    mainAxisExtent: 200,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12),
+            : ListView.separated(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 itemCount: list.length,
-                itemBuilder: (_, i) => _ProductCard(list[i]),
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: C.divider),
+                itemBuilder: (_, i) => _ProductRow(list[i]),
               ),
       ),
       if (!wide && s.cart.isNotEmpty)
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
             child: Material(
               color: context.primary,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
               child: InkWell(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const CheckoutPage())),
                 child: Padding(
@@ -115,20 +114,20 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
                       child: Text('${s.cartCount}',
                           style: const TextStyle(
                               color: Colors.white,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               fontSize: 12)),
                     ),
                     const SizedBox(width: 12),
                     const Text('View cart',
                         style: TextStyle(
                             color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                             fontSize: 14)),
                     const Spacer(),
                     Text(ugx(s.total),
                         style: const TextStyle(
                             color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontSize: 14)),
                   ]),
                 ),
@@ -148,7 +147,7 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
       body: wide
           ? Row(children: [
               Expanded(child: catalog),
-              const VerticalDivider(width: 1, color: C.border),
+              const VerticalDivider(width: 1, color: C.divider),
               Container(
                   width: 400,
                   color: Colors.white,
@@ -159,9 +158,10 @@ class _ProductSelectionPageState extends State<ProductSelectionPage> {
   }
 }
 
-class _ProductCard extends StatelessWidget {
+/// One product: picture, name, price, stock and a round "+" button that adds it to the cart.
+class _ProductRow extends StatelessWidget {
   final Product p;
-  const _ProductCard(this.p);
+  const _ProductRow(this.p);
 
   @override
   Widget build(BuildContext context) {
@@ -172,84 +172,81 @@ class _ProductCard extends StatelessWidget {
     final canAdd = !soldOut && inCart < p.stock;
     return Opacity(
       opacity: soldOut ? .55 : 1,
-      child: AppCard(
-        padding: EdgeInsets.zero,
+      child: InkWell(
         onTap: canAdd ? () => s.addToCart(p) : null,
-        borderColor: inCart > 0 ? context.primary : null,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Stack(children: [
-              Positioned.fill(
-                  child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: ProductImage(p.image,
-                          name: p.name,
-                          w: double.infinity,
-                          h: double.infinity))),
-              if (off > 0)
-                Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Pill(s.promoFor(p)!.label, C.green)),
-              if (inCart > 0)
-                Positioned(
-                    top: 8,
-                    right: 8,
-                    child: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: context.primary,
-                        child: Text('$inCart',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800)))),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(p.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      height: 1.25)),
-              const SizedBox(height: 6),
-              Row(children: [
-                Flexible(
-                    child: Text(ugx(s.unitPrice(p)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: context.primary))),
-                if (off > 0) ...[
-                  const SizedBox(width: 6),
-                  Text(ugx(p.price).replaceFirst('UGX ', ''),
-                      style: const TextStyle(
-                          fontSize: 10.5,
-                          color: C.grey,
-                          decoration: TextDecoration.lineThrough)),
-                ],
-                const Spacer(),
-                Text(soldOut ? 'Sold out' : '${p.stock} left',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(children: [
+            ProductImage(p.image, name: p.name, w: 36, h: 56),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Flexible(
+                      child: Text(p.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600))),
+                  if (off > 0) ...[
+                    const SizedBox(width: 8),
+                    Pill(s.promoFor(p)!.label, C.green),
+                  ],
+                ]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Text(ugx(s.unitPrice(p)),
+                      style: const TextStyle(fontSize: 12.5, color: C.grey)),
+                  if (off > 0) ...[
+                    const SizedBox(width: 6),
+                    Text(ugx(p.price).replaceFirst('UGX ', ''),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: C.hint,
+                            decoration: TextDecoration.lineThrough)),
+                  ],
+                ]),
+                const SizedBox(height: 4),
+                Text(soldOut ? 'Sold out' : 'Stock: ${p.stock}',
                     style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
                         color: soldOut || p.low ? C.red : C.grey)),
               ]),
-            ]),
-          ),
-        ]),
+            ),
+            if (inCart > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                    color: context.primary.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text('$inCart',
+                    style: TextStyle(
+                        color: context.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Material(
+              color: canAdd ? context.primary : C.divider,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: canAdd ? () => s.addToCart(p) : null,
+                child: const SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: Icon(Icons.add, size: 18, color: Colors.white)),
+              ),
+            ),
+          ]),
+        ),
       ),
     );
   }
 }
 
-// ─────────────────────── Cart panel (used by Checkout on phones and beside the grid on tablets) ───────────────────────
+// ─────────────────────── Cart panel (used by Checkout on phones and beside the list on tablets) ───────────────────────
 class CartPanel extends StatefulWidget {
   final VoidCallback onCharge;
   const CartPanel({super.key, required this.onCharge});
@@ -281,8 +278,8 @@ class _CartPanelState extends State<CartPanel> {
 
   Widget _stepper(AppState s, Product p, int qty) => Container(
         decoration: BoxDecoration(
-            border: Border.all(color: C.border),
-            borderRadius: BorderRadius.circular(9)),
+            border: Border.all(color: C.border, width: 1.2),
+            borderRadius: BorderRadius.circular(6)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           InkWell(
               onTap: () => s.changeQty(p, -1),
@@ -290,11 +287,11 @@ class _CartPanelState extends State<CartPanel> {
                   padding: EdgeInsets.all(7),
                   child: Icon(Icons.remove, size: 15))),
           SizedBox(
-              width: 26,
+              width: 28,
               child: Text('$qty',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w700))),
+                      fontSize: 13, fontWeight: FontWeight.w600))),
           InkWell(
               onTap: () => s.changeQty(p, 1),
               child: const Padding(
@@ -306,10 +303,10 @@ class _CartPanelState extends State<CartPanel> {
   Widget _line(AppState s, Product p, int qty) {
     final off = s.unitDiscount(p) > 0;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(children: [
-        ProductImage(p.image, name: p.name, w: 46, h: 46),
-        const SizedBox(width: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ProductImage(p.image, name: p.name, w: 34, h: 60),
+        const SizedBox(width: 14),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -317,49 +314,53 @@ class _CartPanelState extends State<CartPanel> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
           const SizedBox(height: 3),
           Wrap(spacing: 6, children: [
             if (off)
               Text(ugx(p.price),
                   style: const TextStyle(
-                      fontSize: 11,
-                      color: C.grey,
+                      fontSize: 11.5,
+                      color: C.hint,
                       decoration: TextDecoration.lineThrough)),
-            Text('${ugx(s.unitPrice(p))} each',
+            Text(ugx(s.unitPrice(p)),
                 style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 11.5,
                     color: off ? C.green : C.grey,
                     fontWeight: off ? FontWeight.w600 : FontWeight.w400)),
           ]),
+          const SizedBox(height: 10),
+          _stepper(s, p, qty),
         ])),
         const SizedBox(width: 8),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(ugx(s.unitPrice(p) * qty),
-              style:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          _stepper(s, p, qty),
-        ]),
+        SizedBox(
+          height: 80,
+          child: Align(
+            alignment: Alignment.bottomRight,
+            child: Text(ugx(s.unitPrice(p) * qty),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          ),
+        ),
       ]),
     );
   }
 
   Widget _totalRow(String l, String v, {bool big = false, Color? color}) =>
       Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(children: [
           Text(l,
               style: TextStyle(
-                  fontSize: big ? 15 : 12.5,
-                  fontWeight: big ? FontWeight.w800 : FontWeight.w400,
+                  fontSize: big ? 15 : 13,
+                  fontWeight: big ? FontWeight.w700 : FontWeight.w400,
                   color: big ? C.text : C.grey)),
           const Spacer(),
           Text(v,
               style: TextStyle(
-                  fontSize: big ? 18 : 12.5,
-                  fontWeight: big ? FontWeight.w800 : FontWeight.w600,
-                  color: color ?? C.text)),
+                  fontSize: big ? 17 : 13,
+                  fontWeight: big ? FontWeight.w700 : FontWeight.w500,
+                  color: color ?? (big ? C.navy : C.grey))),
         ]),
       );
 
@@ -368,23 +369,19 @@ class _CartPanelState extends State<CartPanel> {
     final s = context.watch<AppState>();
     return Column(children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
+        padding: const EdgeInsets.fromLTRB(20, 14, 12, 4),
         child: Row(children: [
           const Expanded(
               child: Text('Current order',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.3))),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
           if (s.cart.isNotEmpty)
             TextButton(onPressed: () => _clear(s), child: const Text('Clear')),
         ]),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
         child: AppCard(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          color: C.bg,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           onTap: () => showSheet(
               context,
               'Select Customer',
@@ -408,16 +405,13 @@ class _CartPanelState extends State<CartPanel> {
               ])),
           child: Row(children: [
             const Icon(Icons.person_outline, size: 18, color: C.grey),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
                 child: Text(s.customer?.name ?? 'Walk-in Customer',
                     style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600))),
+                        fontSize: 13, fontWeight: FontWeight.w500))),
             Text('Change',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: context.primary,
-                    fontWeight: FontWeight.w700)),
+                style: TextStyle(fontSize: 12, color: context.primary)),
           ]),
         ),
       ),
@@ -426,11 +420,11 @@ class _CartPanelState extends State<CartPanel> {
             ? const EmptyState(Icons.shopping_basket_outlined, 'Cart is empty',
                 'Tap a product or scan a barcode to start a sale.')
             : ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
                     for (final e in s.lines) ...[
                       _line(s, e.key, e.value),
-                      const Divider(height: 1, color: C.border)
+                      const Divider(height: 1, color: C.divider)
                     ],
                     const SizedBox(height: 14),
                     if (s.appliedCode != null && s.appliedCode!.live)
@@ -484,10 +478,10 @@ class _CartPanelState extends State<CartPanel> {
                   ]),
       ),
       Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
         decoration: const BoxDecoration(
             color: Colors.white,
-            border: Border(top: BorderSide(color: C.border))),
+            border: Border(top: BorderSide(color: C.divider))),
         child: SafeArea(
           top: false,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -495,11 +489,11 @@ class _CartPanelState extends State<CartPanel> {
             if (s.discount > 0)
               _totalRow('Discount', '-${ugx(s.discount)}', color: C.green),
             _totalRow('Tax (${(taxRate * 100).round()}%)', ugx(s.tax)),
-            const Divider(color: C.border, height: 18),
+            const Divider(color: C.divider, height: 18),
             _totalRow('Total', ugx(s.total), big: true),
             const SizedBox(height: 10),
             PrimaryButton(s.cart.isEmpty ? 'Charge' : 'Charge ${ugx(s.total)}',
-                height: 54, onTap: s.cart.isEmpty ? null : widget.onCharge),
+                height: 50, onTap: s.cart.isEmpty ? null : widget.onCharge),
           ]),
         ),
       ),
@@ -665,47 +659,44 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     return Scaffold(
-      appBar: appBar(context, 'Payment'),
+      appBar: appBar(context, 'Payment', divider: true),
       body: Centered(
         maxWidth: 520,
-        child: ListView(padding: const EdgeInsets.all(20), children: [
-          AppCard(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            child: Column(children: [
-              const Text('Amount due',
-                  style: TextStyle(fontSize: 12.5, color: C.grey)),
-              const SizedBox(height: 8),
-              Text(ugx(s.total),
+        child: ListView(padding: const EdgeInsets.fromLTRB(20, 28, 20, 20), children: [
+          const Center(
+              child: Text('Total Amount',
+                  style: TextStyle(fontSize: 13, color: C.grey))),
+          const SizedBox(height: 10),
+          Center(
+              child: Text(ugx(s.total),
                   style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1)),
-              if (s.discount > 0) ...[
-                const SizedBox(height: 8),
-                Pill('You saved ${ugx(s.discount)}', C.green),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 22),
-          const SectionTitle('Payment method'),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: C.navy,
+                      letterSpacing: -.5))),
+          if (s.discount > 0) ...[
+            const SizedBox(height: 10),
+            Center(child: Pill('You saved ${ugx(s.discount)}', C.green)),
+          ],
+          const SizedBox(height: 30),
           for (final m in s.methods)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 12),
               child: AppCard(
                 onTap: busy ? null : () => s.setMethod(m),
                 borderColor: s.payMethod == m ? context.primary : null,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(children: [
                   MethodIcon(m, size: 30),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
                   Expanded(
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                         Text(labels[m]![0],
                             style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w700)),
+                                fontSize: 14, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 2),
                         Text(labels[m]![1],
                             style:
@@ -715,13 +706,13 @@ class _PaymentPageState extends State<PaymentPage> {
                       s.payMethod == m
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
-                      color: s.payMethod == m ? context.primary : C.grey),
+                      color: s.payMethod == m ? context.primary : C.hint),
                 ]),
               ),
             ),
           const SizedBox(height: 14),
-          PrimaryButton('Pay ${ugx(s.total)}',
-              height: 54, loading: busy, onTap: busy ? null : _pay),
+          PrimaryButton('Pay Now',
+              height: 50, loading: busy, onTap: busy ? null : _pay),
         ]),
       ),
     );
@@ -771,23 +762,23 @@ class PaymentSuccessPage extends StatelessWidget {
                             child: Icon(Icons.check_rounded,
                                 color: Colors.white, size: 44)))),
                 const SizedBox(height: 24),
-                const Text('Payment successful',
+                const Text('Payment Successful',
                     style: TextStyle(
                         fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -.4)),
+                        fontWeight: FontWeight.w700,
+                        color: C.navy)),
                 const SizedBox(height: 6),
                 Text('${ugx(sale.total)} received',
                     style: const TextStyle(fontSize: 14, color: C.grey)),
                 const SizedBox(height: 26),
                 AppCard(
                   child: Column(children: [
-                    row('Receipt no.', sale.receipt),
+                    row('Receipt No', sale.receipt),
                     row(
                         'Date',
                         DateFormat('MMM d, yyyy · hh:mm a')
                             .format(sale.created)),
-                    row('Payment method', sale.method),
+                    row('Payment Method', sale.method),
                     if (sale.discount > 0)
                       row('Discount', '-${ugx(sale.discount)}'),
                     row('Cashier',
@@ -797,12 +788,12 @@ class PaymentSuccessPage extends StatelessWidget {
                   ]),
                 ),
                 const Spacer(),
-                PrimaryButton('View receipt',
-                    icon: Icons.receipt_long_outlined,
+                PrimaryButton('View Receipt',
+                    icon: Icons.description_outlined,
                     outlined: true,
                     onTap: () => showReceipt(context, sale, s.businessName)),
                 const SizedBox(height: 10),
-                PrimaryButton('New sale',
+                PrimaryButton('Back to Home',
                     onTap: () => Navigator.popUntil(context, (r) => r.isFirst)),
                 const SizedBox(height: 16),
               ]),
