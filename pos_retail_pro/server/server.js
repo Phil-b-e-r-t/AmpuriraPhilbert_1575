@@ -241,13 +241,51 @@ app.post('/paypal/orders', authAny, async (req, res) => {
 app.post('/paypal/orders/:id/capture', authAny, async (req, res) => {
   try {
     const token = await paypalToken();
-    const r = await fetch(`${PP}/v2/checkout/orders/${encodeURIComponent(req.params.id)}/capture`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    const orderUrl = `${PP}/v2/checkout/orders/${encodeURIComponent(req.params.id)}`;
+    const before = await fetch(orderUrl, { headers: { Authorization: `Bearer ${token}` } });
+    const order = await before.json();
+    if (!before.ok) return res.status(502).json({ status: 'FAILED', error: 'Could not verify PayPal order' });
+
+    const respondWithCapture = (result) => {
+      const capture = result.purchase_units?.[0]?.payments?.captures?.[0];
+      const expected = order.purchase_units?.[0]?.amount;
+      const actual = capture?.amount;
+      const sameValue = Number.isFinite(Number(expected?.value)) &&
+        Number.isFinite(Number(actual?.value)) &&
+        Math.round(Number(expected.value) * 100) === Math.round(Number(actual.value) * 100);
+      if (result.status !== 'COMPLETED' || capture?.status !== 'COMPLETED' ||
+          expected?.currency_code !== 'USD' || actual?.currency_code !== expected.currency_code || !sameValue) {
+        return res.status(409).json({ status: 'FAILED', error: 'Could not verify completed payment' });
+      }
+      return res.json({
+        status: 'COMPLETED', captureId: capture.id,
+        amount: actual.value, currency: actual.currency_code,
+      });
+    };
+
+    if (order.status === 'COMPLETED') return respondWithCapture(order);
+    if (order.status !== 'APPROVED') {
+      return res.status(409).json({ status: 'FAILED', error: 'PayPal order has not been approved' });
+    }
+
+    const captureResponse = await fetch(`${orderUrl}/capture`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'PayPal-Request-Id': crypto.createHash('sha256').update(`capture:${req.params.id}`).digest('hex').slice(0, 32),
+      },
     });
-    const j = await r.json();
-    if (!r.ok) return res.status(r.status).json({ status: 'FAILED', error: 'Customer has not approved the payment yet', details: j });
-    const cap = j.purchase_units?.[0]?.payments?.captures?.[0];
-    res.json({ status: j.status, captureId: cap?.id, amount: cap?.amount });
+    const result = await captureResponse.json();
+    if (captureResponse.ok) return respondWithCapture(result);
+
+    // The capture may have succeeded even if its response was lost. Re-read PayPal before reporting failure.
+    const after = await fetch(orderUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (after.ok) {
+      const reconciled = await after.json();
+      if (reconciled.status === 'COMPLETED') return respondWithCapture(reconciled);
+    }
+    return res.status(409).json({ status: 'FAILED', error: 'Could not confirm payment status' });
   } catch (e) { console.error(e); res.status(500).json({ error: 'PayPal capture failed' }); }
 });
 
