@@ -40,45 +40,47 @@ class _ReportsPageState extends State<ReportsPage> {
     final prev = s.totalSince(prevStart, start);
     final pct = prev == 0 ? 0 : ((total - prev) / prev * 100).round();
 
+    Widget bar(double h) => Container(
+        width: 6,
+        height: h,
+        decoration: BoxDecoration(color: context.primary, borderRadius: BorderRadius.circular(2)));
+
     return Scaffold(
       appBar: appBar(context, 'Reports'),
       body: Centered(
         maxWidth: 900,
-        child: ListView(padding: const EdgeInsets.all(16), children: [
+        child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
           SegTabs(const ['Sales', 'Products', 'Payments', 'History'], type, (i) => setState(() => type = i)),
           const SizedBox(height: 10),
           SegTabs(const ['Today', 'Week', 'Month'], range, (i) => setState(() => range = i)),
-          const SizedBox(height: 16),
-          AppCard(
-            padding: const EdgeInsets.all(18),
-            child: Column(children: [
-              Row(children: [
-                Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Total sales', style: TextStyle(fontSize: 12.5, color: C.grey)),
-                  const SizedBox(height: 6),
-                  Text(ugx(total), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -.8)),
-                ])),
-                Pill('${pct >= 0 ? '↑' : '↓'} ${pct.abs()}%', pct >= 0 ? C.green : C.red),
-              ]),
-              const Divider(height: 26, color: C.border),
-              Row(children: [
-                _Stat('Transactions', '${list.length}'),
-                _Stat('Avg. sale', ugx(avg)),
-                _Stat('Discounts', ugx(discounts)),
-                _Stat('Tax', ugx(taxes)),
-              ]),
-            ]),
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 22),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Total Sales', style: TextStyle(fontSize: 12.5, color: C.grey)),
+              const SizedBox(height: 6),
+              Text(ugx(total), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: C.navy)),
+              const SizedBox(height: 8),
+              Text('${pct >= 0 ? '↑' : '↓'} ${pct.abs()}%', style: TextStyle(fontSize: 12, color: pct >= 0 ? C.green : C.red)),
+            ])),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [bar(16), const SizedBox(width: 4), bar(26), const SizedBox(width: 4), bar(36)]),
+          ]),
+          const Divider(height: 28, color: C.divider),
+          Row(children: [
+            _Stat('Transactions', '${list.length}'),
+            _Stat('Avg. sale', ugx(avg)),
+            _Stat('Discounts', ugx(discounts)),
+            _Stat('Tax', ugx(taxes)),
+          ]),
+          const SizedBox(height: 24),
           if (type == 0) ...[
-            const SectionTitle('Sales trend'),
-            AppCard(padding: const EdgeInsets.fromLTRB(8, 18, 16, 10), child: SizedBox(height: 200, child: _Trend(days: range == 2 ? 30 : 7))),
-            const SizedBox(height: 14),
+            const SectionTitle('Sales Trend'),
+            Padding(padding: const EdgeInsets.only(top: 6, right: 4), child: SizedBox(height: 200, child: _Trend(days: range == 2 ? 30 : 7))),
+            const SizedBox(height: 20),
             Row(children: [
-              Expanded(child: _MiniCard(Icons.trending_up, 'Top products', () => setState(() => type = 1))),
-              const SizedBox(width: 10),
-              Expanded(child: _MiniCard(Icons.account_balance_wallet_outlined, 'Payment methods', () => setState(() => type = 2))),
+              Expanded(child: _MiniCard(Icons.trending_up, 'Top Products', () => setState(() => type = 1))),
+              const SizedBox(width: 12),
+              Expanded(child: _MiniCard(Icons.account_balance_wallet_outlined, 'Payment Methods', () => setState(() => type = 2))),
             ]),
           ],
           if (type == 1) ..._topProducts(list, s),
@@ -100,20 +102,20 @@ class _ReportsPageState extends State<ReportsPage> {
     final names = qty.keys.toList()..sort((a, b) => rev[b]!.compareTo(rev[a]!));
     final reorder = s.products.where((p) => p.low).toList()..sort((a, b) => a.stock.compareTo(b.stock));
     return [
-      const SectionTitle('Top products'),
+      const SectionTitle('Top Products'),
       AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: names.isEmpty
             ? const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No product sales in this period yet.', style: TextStyle(color: C.grey, fontSize: 12.5))))
             : Column(children: [
                 for (var i = 0; i < names.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, color: C.border),
+                  if (i > 0) const Divider(height: 1, color: C.divider),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(radius: 15, backgroundColor: context.primary.withValues(alpha: .10), child: Text('${i + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: context.primary))),
-                    title: Text(names[i], style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                    leading: CircleAvatar(radius: 15, backgroundColor: context.primary.withValues(alpha: .10), child: Text('${i + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.primary))),
+                    title: Text(names[i], style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
                     subtitle: Text('${qty[names[i]]} sold', style: const TextStyle(fontSize: 11.5)),
-                    trailing: Text(ugx(rev[names[i]]!), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                    trailing: Text(ugx(rev[names[i]]!), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                   ),
                 ],
               ]),
@@ -125,10 +127,10 @@ class _ReportsPageState extends State<ReportsPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Column(children: [
             for (var i = 0; i < reorder.length; i++) ...[
-              if (i > 0) const Divider(height: 1, color: C.border),
+              if (i > 0) const Divider(height: 1, color: C.divider),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(reorder[i].name, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                title: Text(reorder[i].name, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
                 subtitle: Text('Reorder level ${reorder[i].reorder}', style: const TextStyle(fontSize: 11.5)),
                 trailing: reorder[i].stock == 0 ? const Pill('Out of stock', C.red) : Pill('${reorder[i].stock} left', C.amber),
               ),
@@ -154,11 +156,11 @@ class _ReportsPageState extends State<ReportsPage> {
             Row(children: [
               MethodIcon(k, size: 22),
               const SizedBox(width: 10),
-              Expanded(child: Text(k, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
-              Text(ugx(m[k]!), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+              Expanded(child: Text(k, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500))),
+              Text(ugx(m[k]!), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: 8),
-            ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: total == 0 ? 0 : m[k]! / total, minHeight: 6, backgroundColor: C.border)),
+            ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: total == 0 ? 0 : m[k]! / total, minHeight: 6, backgroundColor: C.divider)),
           ]),
         )
     ];
@@ -177,32 +179,29 @@ class _ReportsPageState extends State<ReportsPage> {
                   },
                   icon: const Icon(Icons.table_chart_outlined, size: 16),
                   label: const Text('Copy CSV'))),
-      AppCard(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: list.isEmpty
-            ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No sales in this period yet.', style: TextStyle(color: C.grey, fontSize: 12.5))))
-            : Column(children: [
-                for (var i = 0; i < list.take(100).length; i++) ...[
-                  if (i > 0) const Divider(height: 1, color: C.border, indent: 12, endIndent: 12),
-                  InkWell(
-                    onTap: () => showReceipt(context, list[i], s.businessName),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      child: Row(children: [
-                        MethodIcon(list[i].method, size: 26),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(list[i].receipt, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                          Text('${list[i].customer} · ${DateFormat('MMM d, hh:mm a').format(list[i].created)}', style: const TextStyle(fontSize: 11, color: C.grey)),
-                        ])),
-                        Text(ugx(list[i].total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                      ]),
-                    ),
+      list.isEmpty
+          ? const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No sales in this period yet.', style: TextStyle(color: C.grey, fontSize: 12.5))))
+          : Column(children: [
+              for (var i = 0; i < list.take(100).length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: C.divider),
+                InkWell(
+                  onTap: () => showReceipt(context, list[i], s.businessName),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(children: [
+                      MethodIcon(list[i].method, size: 26),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(list[i].receipt, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text('${list[i].customer} · ${DateFormat('MMM d, hh:mm a').format(list[i].created)}', style: const TextStyle(fontSize: 11, color: C.grey)),
+                      ])),
+                      Text(ugx(list[i].total), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ]),
                   ),
-                ],
-              ]),
-      ),
+                ),
+              ],
+            ]),
     ];
   }
 
@@ -240,7 +239,7 @@ class _Stat extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: const TextStyle(fontSize: 10.5, color: C.grey)),
           const SizedBox(height: 3),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
         ]),
       );
 }
@@ -256,8 +255,8 @@ class _MiniCard extends StatelessWidget {
         child: Row(children: [
           Icon(icon, color: context.primary),
           const SizedBox(width: 10),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))),
-          const Icon(Icons.chevron_right, size: 18, color: C.grey),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500))),
+          const Icon(Icons.chevron_right, size: 18, color: C.hint),
         ]),
       );
 }
@@ -279,7 +278,7 @@ class _Trend extends StatelessWidget {
       gridData: FlGridData(
           drawVerticalLine: false,
           horizontalInterval: maxY / 2,
-          getDrawingHorizontalLine: (_) => const FlLine(color: C.border, strokeWidth: 1)),
+          getDrawingHorizontalLine: (_) => const FlLine(color: C.divider, strokeWidth: 1)),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),

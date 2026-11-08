@@ -22,63 +22,57 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
     void go(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
-    Widget item(Widget i, String t, String sub, VoidCallback onTap) => ListTile(
-          leading: Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: context.primary.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)),
-            child: IconTheme(data: IconThemeData(size: 20, color: context.primary), child: i),
-          ),
-          title: Text(t, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-          subtitle: Text(sub, style: const TextStyle(fontSize: 11.5, color: C.grey)),
-          trailing: const Icon(Icons.chevron_right, color: C.grey),
+    Widget item(Widget i, String t, String sub, VoidCallback onTap) => InkWell(
           onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(children: [
+              SizedBox(width: 24, child: IconTheme(data: const IconThemeData(size: 20, color: C.text), child: i)),
+              const SizedBox(width: 18),
+              Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                if (sub.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(sub, style: const TextStyle(fontSize: 11.5, color: C.grey))),
+              ])),
+              const Icon(Icons.chevron_right, size: 20, color: C.hint),
+            ]),
+          ),
         );
-    Widget group(List<Widget> items) => AppCard(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0) const Divider(height: 1, color: C.border, indent: 68),
-              items[i],
-            ],
-          ]),
-        );
-    final initial = s.userName.isEmpty ? '?' : s.userName[0].toUpperCase();
+    Widget group(List<Widget> items) => Column(children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: C.divider, indent: 20, endIndent: 20),
+            items[i],
+          ],
+        ]);
 
     return Scaffold(
       appBar: appBar(context, 'Settings', back: !widget.tab),
       body: Centered(
         maxWidth: 640,
-        child: ListView(padding: const EdgeInsets.all(16), children: [
-          AppCard(
-            padding: const EdgeInsets.all(18),
+        child: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             child: Row(children: [
-              CircleAvatar(radius: 28, backgroundColor: context.primary.withValues(alpha: .12), child: Text(initial, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: context.primary))),
-              const SizedBox(width: 16),
+              const CircleAvatar(radius: 30, backgroundColor: C.hint, child: AppIcon(AppIcons.customers, size: 30, color: Colors.white)),
+              const SizedBox(width: 18),
               Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(s.userName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 3),
-                Text(s.userEmail, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: C.grey)),
+                Text(s.userName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.primary)),
+                const SizedBox(height: 4),
+                Text(s.userEmail, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: C.grey)),
                 const SizedBox(height: 8),
                 Pill(s.isOwner ? 'Owner' : 'Cashier', context.primary),
               ])),
             ]),
           ),
-          const SizedBox(height: 18),
-          if (s.isOwner) ...[
-            const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('BUSINESS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.grey, letterSpacing: .8))),
-            group([
-              item(const Icon(Icons.storefront_outlined), 'Business profile', s.businessName, () => go(const BusinessProfilePage())),
-              item(const Icon(Icons.credit_card), 'Payment methods', '${s.methods.length} enabled', () => go(const PaymentMethodsPage())),
-              item(const AppIcon(AppIcons.promotions), 'Promotions & discounts', '${s.promotions.where((p) => p.live).length} active', () => go(const PromotionsPage())),
-              item(const AppIcon(AppIcons.team), 'Staff & roles', '${s.staff.length} team members', () => go(const StaffPage())),
-            ]),
-            const SizedBox(height: 18),
-          ],
-          const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text('ACCOUNT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.grey, letterSpacing: .8))),
+          const Divider(height: 1, color: C.divider),
           group([
+            if (s.isOwner) ...[
+              item(const Icon(Icons.storefront_outlined), 'Business Profile', s.businessName, () => go(const BusinessProfilePage())),
+              item(const Icon(Icons.credit_card), 'Payment Settings', '${s.methods.length} methods enabled', () => go(const PaymentMethodsPage())),
+              item(const AppIcon(AppIcons.promotions), 'Promotions & discounts', '${s.promotions.where((p) => p.live).length} active', () => go(const PromotionsPage())),
+              item(const AppIcon(AppIcons.team), 'User Management', '${s.staff.length} team members', () => go(const StaffPage())),
+            ],
             if (s.hasPasswordLogin)
               item(const Icon(Icons.lock_reset), 'Change password', 'Send a reset link to your email', () async {
                 final err = await context.read<AppState>().sendPasswordReset(s.userEmail);
@@ -95,11 +89,14 @@ class _SettingsPageState extends State<SettingsPage> {
               }),
             item(const Icon(Icons.info_outline), 'About', 'POS Retail Pro 1.1.0', () => showAboutDialog(context: context, applicationName: 'POS Retail Pro', applicationVersion: '1.1.0')),
           ]),
-          const SizedBox(height: 22),
-          PrimaryButton('Log out', outlined: true, color: C.red, icon: Icons.logout, onTap: () async {
-            await context.read<AppState>().logout();
-            if (context.mounted) Navigator.popUntil(context, (r) => r.isFirst);
-          }),
+          const Divider(height: 1, color: C.divider, indent: 20, endIndent: 20),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+            child: PrimaryButton('Log out', outlined: true, color: C.red, icon: Icons.logout, onTap: () async {
+              await context.read<AppState>().logout();
+              if (context.mounted) Navigator.popUntil(context, (r) => r.isFirst);
+            }),
+          ),
         ]),
       ),
     );
@@ -155,7 +152,7 @@ class _SetPasswordFormState extends State<_SetPasswordForm> {
       Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-        decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: C.border)),
+        decoration: BoxDecoration(color: C.bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: C.border, width: 1.2)),
         child: Row(children: [
           const Icon(Icons.mail_outline, size: 20, color: C.grey),
           const SizedBox(width: 10),
@@ -204,34 +201,30 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
         appBar: appBar(context, 'Business Profile'),
         body: Centered(
           maxWidth: 560,
-          child: ListView(padding: const EdgeInsets.all(20), children: [
-            AppCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const FieldLabel('Business name'),
-                AppField('My Store', controller: name),
-                const FieldLabel('Business type'),
-                DropdownButtonFormField<String>(
-                  initialValue: types.contains(type) ? type : types.first,
-                  decoration: InputDecoration(
-                      isDense: true,
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: C.border))),
-                  items: types.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  onChanged: (v) => setState(() => type = v ?? type),
-                ),
-                const FieldLabel('Theme colour'),
-                Wrap(spacing: 12, runSpacing: 12, children: [
-                  for (final c in swatches)
-                    GestureDetector(
-                      onTap: () => setState(() => color = c),
-                      child: CircleAvatar(radius: 18, backgroundColor: c, child: color == c ? const Icon(Icons.check, color: Colors.white, size: 18) : null),
-                    ),
-                ]),
-              ]),
+          child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 20), children: [
+            const FieldLabel('Business Name'),
+            AppField('My Store', controller: name),
+            const FieldLabel('Business Type'),
+            DropdownButtonFormField<String>(
+              initialValue: types.contains(type) ? type : types.first,
+              decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: C.border, width: 1.2))),
+              items: types.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => type = v ?? type),
             ),
-            const SizedBox(height: 20),
+            const FieldLabel('Theme Color'),
+            Wrap(spacing: 12, runSpacing: 12, children: [
+              for (final c in swatches)
+                GestureDetector(
+                  onTap: () => setState(() => color = c),
+                  child: CircleAvatar(radius: 16, backgroundColor: c, child: color == c ? const Icon(Icons.check, color: Colors.white, size: 16) : null),
+                ),
+            ]),
+            const SizedBox(height: 32),
             PrimaryButton('Save', onTap: () async {
               await context.read<AppState>().saveProfile(name.text.trim().isEmpty ? 'My Store' : name.text.trim(), type, color);
               if (context.mounted) Navigator.pop(context);
@@ -272,7 +265,7 @@ class PaymentMethodsPage extends StatelessWidget {
               for (final m in s.backendMethods)
                 SwitchListTile(
                   secondary: Icon(methodIcon(m), color: C.grey),
-                  title: Text(m, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  title: Text(m, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500)),
                   subtitle: Text(_desc[m] ?? '', style: const TextStyle(fontSize: 11.5)),
                   value: s.isMethodEnabled(m),
                   onChanged: m == 'Cash' ? null : (v) => s.setMethodEnabled(m, v),
