@@ -11,3 +11,4 @@ class Api {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 }
+// Preview builds now receive the Firebase environment variables.
