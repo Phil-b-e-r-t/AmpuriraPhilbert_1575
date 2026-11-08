@@ -9,10 +9,12 @@ extension Ctx on BuildContext {
     ..showSnackBar(SnackBar(content: Text(m)));
 }
 
-PreferredSizeWidget appBar(BuildContext c, String title, {bool back = true, List<Widget>? actions}) => AppBar(
+PreferredSizeWidget appBar(BuildContext c, String title,
+        {bool back = true, List<Widget>? actions, bool divider = false}) =>
+    AppBar(
       automaticallyImplyLeading: false,
-      leading: back ? IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => Navigator.maybePop(c)) : null,
-      title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -.2)),
+      leading: back ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.maybePop(c)) : null,
+      title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: C.text)),
       centerTitle: false,
       titleSpacing: back ? 0 : 20,
       backgroundColor: Colors.white,
@@ -20,7 +22,9 @@ PreferredSizeWidget appBar(BuildContext c, String title, {bool back = true, List
       elevation: 0,
       scrolledUnderElevation: 0,
       actions: [...?actions, const SizedBox(width: 4)],
-      bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: C.border)),
+      bottom: divider
+          ? const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: C.divider))
+          : null,
     );
 
 /// Keeps content readable on large screens by limiting its width and centering it.
@@ -33,7 +37,7 @@ class Centered extends StatelessWidget {
       Align(alignment: Alignment.topCenter, child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child));
 }
 
-/// White, flat, softly-rounded surface: the basic building block of every screen.
+/// White, flat surface with a thin light-blue outline: the basic building block of every screen.
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -44,7 +48,8 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) => Material(
         color: color ?? Colors.white,
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: borderColor ?? C.border)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10), side: BorderSide(color: borderColor ?? C.border, width: 1.2)),
         child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
       );
 }
@@ -57,7 +62,7 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Row(children: [
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -.2))),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: C.text))),
           if (trailing != null) trailing!,
         ]),
       );
@@ -91,7 +96,7 @@ class EmptyState extends StatelessWidget {
                 decoration: BoxDecoration(color: context.primary.withValues(alpha: .08), shape: BoxShape.circle),
                 child: Icon(icon, size: 30, color: context.primary)),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
             Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, color: C.grey, height: 1.45)),
           ]),
@@ -113,8 +118,8 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = onTap != null && !loading;
     final base = color ?? context.primary;
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
-    const textStyle = TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: .1);
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+    const textStyle = TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600);
     final child = loading
         ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: outlined ? base : Colors.white))
         : Row(mainAxisSize: MainAxisSize.min, children: [
@@ -130,7 +135,7 @@ class PrimaryButton extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: base,
                 backgroundColor: Colors.white,
-                side: BorderSide(color: color == null ? base.withValues(alpha: .45) : C.border),
+                side: BorderSide(color: color == null ? base.withValues(alpha: .45) : C.border, width: 1.2),
                 shape: shape,
                 textStyle: textStyle,
               ),
@@ -140,7 +145,7 @@ class PrimaryButton extends StatelessWidget {
               style: FilledButton.styleFrom(
                 backgroundColor: base,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: C.border,
+                disabledBackgroundColor: C.divider,
                 disabledForegroundColor: C.grey,
                 elevation: 0,
                 shape: shape,
@@ -156,15 +161,26 @@ class AppField extends StatelessWidget {
   final IconData? icon;
   final TextEditingController? controller;
   final bool obscure;
+
+  /// Grey-filled variant used for search boxes.
+  final bool soft;
   final Widget? suffix;
   final TextInputType? type;
   final ValueChanged<String>? onChanged, onSubmitted;
   const AppField(this.hint,
-      {super.key, this.icon, this.controller, this.obscure = false, this.suffix, this.type, this.onChanged, this.onSubmitted});
+      {super.key,
+      this.icon,
+      this.controller,
+      this.obscure = false,
+      this.soft = false,
+      this.suffix,
+      this.type,
+      this.onChanged,
+      this.onSubmitted});
 
   @override
   Widget build(BuildContext context) {
-    OutlineInputBorder b(Color c, [double w = 1]) =>
+    OutlineInputBorder b(Color c, [double w = 1.2]) =>
         OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
     return TextField(
       controller: controller,
@@ -175,12 +191,12 @@ class AppField extends StatelessWidget {
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: C.grey, fontSize: 14),
-        prefixIcon: icon == null ? null : Icon(icon, size: 20, color: C.grey),
+        hintStyle: const TextStyle(color: C.hint, fontSize: 14),
+        prefixIcon: icon == null ? null : Icon(icon, size: 20, color: C.hint),
         suffixIcon: suffix,
         isDense: true,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: soft ? C.bg : Colors.white,
         contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
         enabledBorder: b(C.border),
         border: b(C.border),
@@ -196,48 +212,47 @@ class FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
       padding: const EdgeInsets.only(bottom: 6, top: 14),
-      child: Text(t, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.grey)));
+      child: Text(t, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: C.text)));
 }
 
-/// Segmented control (inventory filters, report tabs, ranges).
+/// Tab buttons (inventory filters, report types, ranges): the active one is filled with the brand
+/// colour, the others are white with a light outline.
 class SegTabs extends StatelessWidget {
   final List<String> labels;
   final int index;
   final ValueChanged<int> onChanged;
   const SegTabs(this.labels, this.index, this.onChanged, {super.key});
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: const Color(0xFFE5EAF1), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          for (var i = 0; i < labels.length; i++)
-            Expanded(
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onChanged(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: i == index ? Colors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(9),
-                      boxShadow: i == index
-                          ? const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))]
-                          : const [],
-                    ),
-                    child: Text(labels[i],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: i == index ? C.text : C.grey)),
-                  ),
-                ),
+  Widget build(BuildContext context) {
+    final primary = context.primary;
+    return Row(children: [
+      for (var i = 0; i < labels.length; i++) ...[
+        if (i > 0) const SizedBox(width: 8),
+        Expanded(
+          child: Material(
+            color: i == index ? primary : Colors.white,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: i == index ? primary : C.border, width: 1.2)),
+            child: InkWell(
+              onTap: () => onChanged(i),
+              child: Container(
+                height: 40,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.w600, color: i == index ? Colors.white : C.text)),
               ),
             ),
-        ]),
-      );
+          ),
+        ),
+      ],
+    ]);
+  }
 }
 
 /// Product picture. Falls back to a coloured tile with the product's first letter.
@@ -307,7 +322,7 @@ Future<T?> showSheet<T>(BuildContext c, String title, Widget body) => showModalB
       useSafeArea: true,
       backgroundColor: Colors.white,
       constraints: const BoxConstraints(maxWidth: 560),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
         child: SingleChildScrollView(
@@ -317,9 +332,9 @@ Future<T?> showSheet<T>(BuildContext c, String title, Widget body) => showModalB
                     width: 40,
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(color: C.border, borderRadius: BorderRadius.circular(2)))),
+                    decoration: BoxDecoration(color: C.divider, borderRadius: BorderRadius.circular(2)))),
             Row(children: [
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -.3))),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: C.text))),
               IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
             ]),
             body,

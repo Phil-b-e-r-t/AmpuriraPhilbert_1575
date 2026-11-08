@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../app_icons.dart';
 import '../state.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// Brand panel: gradient with the logo, name and (on large screens) the key selling points.
+/// Brand panel (tablet / desktop only): gradient with the logo, name and the key selling points.
 class _BrandPanel extends StatelessWidget {
   final bool compact;
   const _BrandPanel({this.compact = false});
@@ -21,12 +22,7 @@ class _BrandPanel extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(32, compact ? MediaQuery.of(context).padding.top + 24 : 48, 32, compact ? 24 : 48),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [context.primary, Color.lerp(context.primary, Colors.black, .45)!]),
-      ),
+      decoration: BoxDecoration(color: context.primary),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
@@ -35,12 +31,12 @@ class _BrandPanel extends StatelessWidget {
             width: 72,
             height: 72,
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
             child: Image.asset('assets/images/logo.png',
                 errorBuilder: (_, __, ___) => Icon(Icons.storefront_rounded, size: 38, color: context.primary)),
           ),
           const SizedBox(height: 20),
-          const Text('POS Retail Pro', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -.8)),
+          const Text('POS Retail Pro', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -.6)),
           const SizedBox(height: 8),
           Text('Sell faster. Stock smarter.\nManage your business anytime, anywhere.',
               textAlign: compact ? TextAlign.center : TextAlign.start,
@@ -80,11 +76,11 @@ class _AuthFrame extends StatelessWidget {
     final form = Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
-        child: ListView(shrinkWrap: true, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24), children: [
-          Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8)),
-          const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(fontSize: 13.5, color: C.grey)),
-          const SizedBox(height: 28),
+        child: ListView(shrinkWrap: true, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8), children: [
+          Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: C.navy)),
+          const SizedBox(height: 8),
+          Text(subtitle, style: const TextStyle(fontSize: 14, color: C.grey)),
+          const SizedBox(height: 26),
           ...children,
         ]),
       ),
@@ -94,7 +90,7 @@ class _AuthFrame extends StatelessWidget {
       appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => Navigator.pop(context))),
+          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))),
       body: SafeArea(child: wide ? Row(children: [const Expanded(child: _BrandPanel()), Expanded(child: form)]) : form),
     );
   }
@@ -103,34 +99,52 @@ class _AuthFrame extends StatelessWidget {
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
+  /// Phone layout: cart icon, name, tagline and a single "Get Started" button.
+  Widget _phone(BuildContext context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(children: [
+            const Spacer(flex: 3),
+            AppIcon(AppIcons.cart, size: 76, color: context.primary),
+            const SizedBox(height: 28),
+            const Text('POS Retail Pro', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: C.navy, letterSpacing: -.4)),
+            const SizedBox(height: 22),
+            const Text('Manage your business\nanytime, anywhere', textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: C.grey, height: 1.5)),
+            const Spacer(flex: 4),
+            PrimaryButton('Get Started', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()))),
+            const SizedBox(height: 28),
+            const Text('Version 1.1.0', style: TextStyle(fontSize: 11.5, color: C.hint)),
+            const SizedBox(height: 6),
+            const Text('© 2026 Ampurira Philbert · ampuriraphilbert@gmail.com', textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, color: C.hint)),
+            const SizedBox(height: 16),
+          ]),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
+    if (!context.wide) return Scaffold(backgroundColor: Colors.white, body: _phone(context));
     final cta = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Text('Welcome', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -.8)),
+          const Text('Welcome', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: C.navy)),
           const SizedBox(height: 8),
           const Text('Sign in to start selling, or create an account for your store.',
               textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: C.grey, height: 1.5)),
           const SizedBox(height: 28),
-          PrimaryButton('Sign in', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()))),
+          PrimaryButton('Login', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage()))),
           const SizedBox(height: 12),
           PrimaryButton('Create account', outlined: true, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupPage()))),
           const SizedBox(height: 28),
-          const Text('© 2026 Ampurira Philbert · ampuriraphilbert@gmail.com', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: C.grey)),
+          const Text('© 2026 Ampurira Philbert · ampuriraphilbert@gmail.com', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: C.hint)),
         ]),
       ),
     );
     return Scaffold(
       backgroundColor: Colors.white,
-      body: context.wide
-          ? Row(children: [const Expanded(child: _BrandPanel()), Expanded(child: Center(child: cta))])
-          : Column(children: [
-              const _BrandPanel(compact: true),
-              Expanded(child: SafeArea(top: false, child: Center(child: SingleChildScrollView(child: cta)))),
-            ]),
+      body: Row(children: [const Expanded(child: _BrandPanel()), Expanded(child: Center(child: cta))]),
     );
   }
 }
@@ -198,8 +212,8 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final authError = context.watch<AppState>().firebaseAuthError;
     return _AuthFrame(
-      title: 'Sign in',
-      subtitle: 'Welcome back. Enter your details to continue.',
+      title: 'Login',
+      subtitle: 'Sign in to your account',
       children: [
         if (authError != null)
           Container(
@@ -209,16 +223,16 @@ class _LoginPageState extends State<LoginPage> {
             child: Text(authError, style: const TextStyle(fontSize: 12, color: C.red)),
           ),
         AppField('Email', icon: Icons.mail_outline, controller: _id, type: TextInputType.emailAddress),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         AppField('Password',
             icon: Icons.lock_outline,
             controller: _pw,
             obscure: _hide,
             onSubmitted: (_) => _busy ? null : _login(),
             suffix: IconButton(
-                icon: Icon(_hide ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                icon: Icon(_hide ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: C.grey),
                 onPressed: () => setState(() => _hide = !_hide))),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
           child: InkWell(
@@ -226,20 +240,20 @@ class _LoginPageState extends State<LoginPage> {
               borderRadius: BorderRadius.circular(4),
               child: Padding(
                 padding: const EdgeInsets.all(4),
-                child: Text('Forgot password?', style: TextStyle(fontSize: 12.5, color: context.primary, fontWeight: FontWeight.w600)),
+                child: Text('Forgot password?', style: TextStyle(fontSize: 12.5, color: context.primary)),
               )),
         ),
-        const SizedBox(height: 18),
-        PrimaryButton('Sign in', loading: _busy, onTap: _busy ? null : _login),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        PrimaryButton('Login', loading: _busy, onTap: _busy ? null : _login),
+        const SizedBox(height: 22),
         const Row(children: [
-          Expanded(child: Divider(color: C.border)),
-          Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('OR', style: TextStyle(fontSize: 11, color: C.grey))),
-          Expanded(child: Divider(color: C.border)),
+          Expanded(child: Divider(color: C.divider)),
+          Padding(padding: EdgeInsets.symmetric(horizontal: 14), child: Text('OR', style: TextStyle(fontSize: 11.5, color: C.grey))),
+          Expanded(child: Divider(color: C.divider)),
         ]),
-        const SizedBox(height: 20),
+        const SizedBox(height: 22),
         PrimaryButton('Continue with Google', icon: Icons.g_mobiledata, outlined: true, color: C.text, loading: _busy, onTap: _busy ? null : _googleLogin),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         Center(
           child: InkWell(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupPage())),
@@ -248,8 +262,8 @@ class _LoginPageState extends State<LoginPage> {
               padding: const EdgeInsets.all(4),
               child: Text.rich(TextSpan(
                   text: "Don't have an account? ",
-                  style: const TextStyle(fontSize: 12.5, color: C.grey),
-                  children: [TextSpan(text: 'Sign up', style: TextStyle(color: context.primary, fontWeight: FontWeight.w700))])),
+                  style: const TextStyle(fontSize: 13, color: C.grey),
+                  children: [TextSpan(text: 'Sign Up', style: TextStyle(color: context.primary))])),
             ),
           ),
         ),
@@ -318,25 +332,25 @@ class _SignupPageState extends State<SignupPage> {
         subtitle: 'Set up your store in less than a minute.',
         children: [
           AppField('Full name', icon: Icons.person_outline, controller: _name),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           AppField('Email', icon: Icons.mail_outline, controller: _email, type: TextInputType.emailAddress),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           AppField('Password',
               icon: Icons.lock_outline,
               controller: _password,
               obscure: _hidePassword,
               suffix: IconButton(
-                icon: Icon(_hidePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                icon: Icon(_hidePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: C.grey),
                 onPressed: () => setState(() => _hidePassword = !_hidePassword),
               )),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           AppField('Confirm password',
               icon: Icons.lock_outline,
               controller: _confirmPassword,
               obscure: _hideConfirmation,
               onSubmitted: (_) => _busy ? null : _register(),
               suffix: IconButton(
-                icon: Icon(_hideConfirmation ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18),
+                icon: Icon(_hideConfirmation ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: C.grey),
                 onPressed: () => setState(() => _hideConfirmation = !_hideConfirmation),
               )),
           const SizedBox(height: 24),
@@ -350,8 +364,8 @@ class _SignupPageState extends State<SignupPage> {
                 padding: const EdgeInsets.all(4),
                 child: Text.rich(TextSpan(
                   text: 'Already have an account? ',
-                  style: const TextStyle(fontSize: 12.5, color: C.grey),
-                  children: [TextSpan(text: 'Sign in', style: TextStyle(color: context.primary, fontWeight: FontWeight.w700))],
+                  style: const TextStyle(fontSize: 13, color: C.grey),
+                  children: [TextSpan(text: 'Login', style: TextStyle(color: context.primary))],
                 )),
               ),
             ),
