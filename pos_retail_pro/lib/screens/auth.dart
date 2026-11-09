@@ -19,10 +19,17 @@ class _BrandPanel extends StatelessWidget {
       (Icons.bar_chart_rounded, 'Sales reports and receipts in one place'),
       (Icons.wifi_off_rounded, 'Keeps selling when the internet drops'),
     ];
-    return Container(
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Background picture for the left card: put your image at assets/images/brand_bg.png
+        // (if the file is missing, the plain green panel is shown as before).
+        Container(color: context.primary),
+        Image.asset('assets/images/brand_bg.png',
+            fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+        Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(32, compact ? MediaQuery.of(context).padding.top + 24 : 48, 32, compact ? 24 : 48),
-      decoration: BoxDecoration(color: context.primary),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
@@ -37,10 +44,6 @@ class _BrandPanel extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text('POS Retail Pro', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -.6)),
-          const SizedBox(height: 8),
-          Text('Sell faster. Stock smarter.\nManage your business anytime, anywhere.',
-              textAlign: compact ? TextAlign.center : TextAlign.start,
-              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
           if (!compact) ...[
             const SizedBox(height: 36),
             for (final p in points)
@@ -60,6 +63,8 @@ class _BrandPanel extends StatelessWidget {
           ],
         ],
       ),
+    ),
+      ],
     );
   }
 }
@@ -99,13 +104,20 @@ class _AuthFrame extends StatelessWidget {
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 
-  /// Phone layout: cart icon, name, tagline and a single "Get Started" button.
+  /// Phone layout: business logo, name, tagline and a single "Get Started" button.
   Widget _phone(BuildContext context) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(children: [
             const Spacer(flex: 3),
-            AppIcon(AppIcons.cart, size: 76, color: context.primary),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Image.asset('assets/images/logo.png',
+                  width: 96,
+                  height: 96,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => AppIcon(AppIcons.cart, size: 76, color: context.primary)),
+            ),
             const SizedBox(height: 28),
             const Text('POS Retail Pro', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: C.navy, letterSpacing: -.4)),
             const SizedBox(height: 22),
