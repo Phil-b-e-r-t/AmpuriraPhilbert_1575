@@ -37,9 +37,12 @@ class _BrandPanel extends StatelessWidget {
           Container(
             width: 72,
             height: 72,
-            padding: const EdgeInsets.all(14),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
             child: Image.asset('assets/images/logo.png',
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Icon(Icons.storefront_rounded, size: 38, color: context.primary)),
           ),
           const SizedBox(height: 20),
